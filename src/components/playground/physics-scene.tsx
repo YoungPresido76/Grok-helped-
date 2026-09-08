@@ -1,0 +1,311 @@
+import { useFrame, useThree } from "@react-three/fiber";
+import {
+  BallCollider,
+  CuboidCollider,
+  CylinderCollider,
+  Physics,
+  RigidBody,
+  useRapier,
+  type RapierRigidBody,
+} from "@react-three/rapier";
+import { useEffect, useMemo, useRef } from "react";
+import { Color, MeshStandardMaterial, Plane, Vector2, Vector3 } from "three";
+import { orbitControlsRef } from "./orbit-controls";
+import { usePlayground, type ShapeKind, type SpawnedBody } from "./store";
+
+const GRAB_Y_MIN = 0.55;
+const ARENA_RADIUS = 14;
+const FALL_KILL = -8;
+
+const pointerNdc = new Vector2();
+const grabPlane = new Plane();
+const planeHit = new Vector3();
+const camDir = new Vector3();
+const grabTarget = new Vector3();
+const grabVel = new Vector3();
+const rayOrigin = { x: 0, y: 0, z: 0 };
+const rayDir = { x: 0, y: 0, z: 1 };
+
+const bodyRefs = new Map<string, RapierRigidBody>();
+
+function PhysicsArena() {
+  const restitution = usePlayground((s) => s.restitution);
+  return (
+    <>
+      <RigidBody type="fixed" colliders={false} friction={0.85} restitution={restitution}>
+        <CuboidCollider args={[16, 0.2, 16]} position={[0, -1.2, 0]} />
+      </RigidBody>
+      <RigidBody type="fixed" colliders={false} friction={0.72} restitution={restitution}>
+        <CylinderCollider args={[0.25, 6.5]} />
+      </RigidBody>
+    </>
+  );
+}
+
+function shapeMaterial(kind: ShapeKind, color: string) {
+  const roughness = kind === "box" ? 0.34 : kind === "sphere" ? 0.52 : 0.44;
+  const metalness = kind === "box" ? 0.28 : kind === "sphere" ? 0.06 : 0.14;
+  return new MeshStandardMaterial({
+    color: new Color(color),
+    roughness,
+    metalness,
+  });
+}
+
+function ShapeBody({ body }: { body: SpawnedBody }) {
+  const restitution = usePlayground((s) => s.restitution);
+  const material = useMemo(
+    () => shapeMaterial(body.kind, body.color),
+    [body.kind, body.color],
+  );
+  const friction = body.kind === "sphere" ? 0.28 : body.kind === "box" ? 0.72 : 0.5;
+
+  useEffect(() => () => material.dispose(), [material]);
+
+  return (
+    <RigidBody
+      ref={(api) => {
+        if (api) bodyRefs.set(body.id, api);
+        else bodyRefs.delete(body.id);
+      }}
+      position={body.position}
+      rotation={body.rotation}
+      colliders={false}
+      restitution={restitution}
+      friction={friction}
+      linearDamping={0.12}
+      angularDamping={0.16}
+      angularVelocity={body.angularVelocity}
+      ccd
+      canSleep
+    >
+      {body.kind === "sphere" && <BallCollider args={[0.46]} />}
+      {body.kind === "box" && <CuboidCollider args={[0.42, 0.42, 0.42]} />}
+      {body.kind === "cylinder" && <CylinderCollider args={[0.5, 0.38]} />}
+      <mesh castShadow receiveShadow material={material}>
+        {body.kind === "sphere" && <sphereGeometry args={[0.46, 32, 24]} />}
+        {body.kind === "box" && <boxGeometry args={[0.84, 0.84, 0.84]} />}
+        {body.kind === "cylinder" && <cylinderGeometry args={[0.38, 0.38, 1, 28]} />}
+      </mesh>
+    </RigidBody>
+  );
+}
+
+function Bodies() {
+  const bodies = usePlayground((s) => s.bodies);
+  return (
+    <>
+      {bodies.map((body) => (
+        <ShapeBody key={body.id} body={body} />
+      ))}
+    </>
+  );
+}
+
+function setNdc(event: PointerEvent, el: HTMLCanvasElement) {
+  const rect = el.getBoundingClientRect();
+  pointerNdc.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+  pointerNdc.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+}
+
+function GrabController() {
+  const { gl, camera, raycaster } = useThree();
+  const { world, rapier } = useRapier();
+  const setDragging = usePlayground((s) => s.setDragging);
+  const paused = usePlayground((s) => s.paused);
+  const grab = useRef<{
+    body: RapierRigidBody;
+    offset: Vector3;
+    planePoint: Vector3;
+    last: Vector3;
+    velocity: Vector3;
+    lastTime: number;
+    pointerId: number;
+  } | null>(null);
+
+  useEffect(() => {
+    const el = gl.domElement;
+    el.style.touchAction = "none";
+
+    const pickDynamic = () => {
+      raycaster.setFromCamera(pointerNdc, camera);
+      rayOrigin.x = raycaster.ray.origin.x;
+      rayOrigin.y = raycaster.ray.origin.y;
+      rayOrigin.z = raycaster.ray.origin.z;
+      rayDir.x = raycaster.ray.direction.x;
+      rayDir.y = raycaster.ray.direction.y;
+      rayDir.z = raycaster.ray.direction.z;
+      const ray = new rapier.Ray(rayOrigin, rayDir);
+      const hit = world.castRay(
+        ray,
+        48,
+        true,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        (collider) => {
+          const parent = collider.parent();
+          return parent !== null && parent.isDynamic();
+        },
+      );
+      if (!hit) return null;
+      const parent = hit.collider.parent();
+      if (!parent) return null;
+      const point = ray.pointAt(hit.timeOfImpact);
+      return {
+        body: parent,
+        point: new Vector3(point.x, point.y, point.z),
+      };
+    };
+
+    const onDown = (event: PointerEvent) => {
+      if (event.button !== 0) return;
+      setNdc(event, el);
+      const picked = pickDynamic();
+      if (!picked || !picked.body.isValid()) return;
+
+      event.stopImmediatePropagation();
+      event.preventDefault();
+
+      picked.body.wakeUp();
+      picked.body.setBodyType(rapier.RigidBodyType.KinematicPositionBased, true);
+      picked.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
+      const translation = picked.body.translation();
+      grab.current = {
+        body: picked.body,
+        offset: new Vector3(
+          picked.point.x - translation.x,
+          picked.point.y - translation.y,
+          picked.point.z - translation.z,
+        ),
+        planePoint: picked.point,
+        last: new Vector3(translation.x, translation.y, translation.z),
+        velocity: new Vector3(),
+        lastTime: performance.now(),
+        pointerId: event.pointerId,
+      };
+      if (orbitControlsRef.current) orbitControlsRef.current.enabled = false;
+      setDragging(true);
+      el.style.cursor = "grabbing";
+      try {
+        el.setPointerCapture(event.pointerId);
+      } catch {
+        /* best-effort */
+      }
+    };
+
+    const onMove = (event: PointerEvent) => {
+      setNdc(event, el);
+      if (grab.current) return;
+      el.style.cursor = pickDynamic() ? "grab" : "auto";
+    };
+
+    const onEnd = (event: PointerEvent) => {
+      const active = grab.current;
+      if (!active || event.pointerId !== active.pointerId) return;
+      if (active.body.isValid()) {
+        active.body.setBodyType(rapier.RigidBodyType.Dynamic, true);
+        const speed = active.velocity.length();
+        if (speed > 18) active.velocity.multiplyScalar(18 / speed);
+        active.body.setLinvel(
+          { x: active.velocity.x, y: active.velocity.y, z: active.velocity.z },
+          true,
+        );
+      }
+      grab.current = null;
+      if (orbitControlsRef.current) orbitControlsRef.current.enabled = true;
+      setDragging(false);
+      el.style.cursor = "auto";
+      try {
+        el.releasePointerCapture(event.pointerId);
+      } catch {
+        /* already released */
+      }
+    };
+
+    const preventMenu = (event: Event) => event.preventDefault();
+    el.addEventListener("pointerdown", onDown, { capture: true });
+    el.addEventListener("pointermove", onMove);
+    el.addEventListener("pointerup", onEnd);
+    el.addEventListener("pointercancel", onEnd);
+    el.addEventListener("contextmenu", preventMenu);
+    return () => {
+      el.removeEventListener("pointerdown", onDown, { capture: true });
+      el.removeEventListener("pointermove", onMove);
+      el.removeEventListener("pointerup", onEnd);
+      el.removeEventListener("pointercancel", onEnd);
+      el.removeEventListener("contextmenu", preventMenu);
+    };
+  }, [camera, gl, rapier, raycaster, setDragging, world]);
+
+  useFrame(() => {
+    const active = grab.current;
+    if (!active || !active.body.isValid()) return;
+
+    camera.getWorldDirection(camDir);
+    grabPlane.setFromNormalAndCoplanarPoint(camDir, active.planePoint);
+    raycaster.setFromCamera(pointerNdc, camera);
+    if (!raycaster.ray.intersectPlane(grabPlane, planeHit)) return;
+
+    grabTarget.copy(planeHit).sub(active.offset);
+    grabTarget.y = Math.max(GRAB_Y_MIN, grabTarget.y);
+    const radial = Math.hypot(grabTarget.x, grabTarget.z);
+    if (radial > ARENA_RADIUS) {
+      const scale = ARENA_RADIUS / radial;
+      grabTarget.x *= scale;
+      grabTarget.z *= scale;
+    }
+
+    const now = performance.now();
+    const dt = Math.min(0.08, Math.max(1 / 120, (now - active.lastTime) / 1000));
+    grabVel.copy(grabTarget).sub(active.last).divideScalar(dt);
+    active.velocity.lerp(grabVel, 0.45);
+    active.last.copy(grabTarget);
+    active.lastTime = now;
+
+    active.body.setNextKinematicTranslation(grabTarget);
+    if (paused) active.body.setTranslation(grabTarget, true);
+  });
+
+  return null;
+}
+
+function BodyCuller() {
+  const bodies = usePlayground((s) => s.bodies);
+  const remove = usePlayground((s) => s.remove);
+  const dragging = usePlayground((s) => s.dragging);
+
+  useFrame(() => {
+    if (dragging) return;
+    for (const body of bodies) {
+      const rb = bodyRefs.get(body.id);
+      if (!rb || !rb.isValid()) continue;
+      if (rb.translation().y < FALL_KILL) remove(body.id);
+    }
+  });
+
+  return null;
+}
+
+export default function PhysicsScene() {
+  const gravity = usePlayground((s) => s.gravity);
+  const paused = usePlayground((s) => s.paused);
+
+  return (
+    <Physics
+      gravity={[0, -gravity, 0]}
+      timeStep={1 / 60}
+      interpolate
+      paused={paused}
+      numSolverIterations={8}
+      numInternalPgsIterations={2}
+      maxCcdSubsteps={2}
+    >
+      <PhysicsArena />
+      <Bodies />
+      <GrabController />
+      <BodyCuller />
+    </Physics>
+  );
+}
