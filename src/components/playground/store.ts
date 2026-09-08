@@ -27,8 +27,8 @@ export type SavedStructure = {
   restitution: number;
 };
 
-export type PresetKind = "wall" | "floor" | "pillar";
-export type ConstructionTool = "spawn" | "weld" | "demolish" | "scale";
+export type PresetKind = "wall" | "floor" | "pillar" | "room" | "bridge";
+export type ConstructionTool = "spawn" | "select" | "weld" | "demolish" | "scale";
 
 export const STRUCTURE_STORAGE_KEY = "dropyard.structure.v1";
 export const liveBodyPoses = new Map<
@@ -182,6 +182,8 @@ type PlaygroundState = {
     rotation?: [number, number, number],
   ) => void;
   transformSelected: (rotationDelta: number, scaleFactor: number) => void;
+  moveSelected: (axis: "x" | "y" | "z", distance: number) => void;
+  rotateSelected: (axis: "x" | "y" | "z", degrees: number) => void;
   spawnPreset: (preset: PresetKind) => void;
   saveStructure: () => boolean;
   loadStructure: () => boolean;
@@ -301,6 +303,27 @@ export const usePlayground = create<PlaygroundState>((set) => ({
           : body,
       ),
     })),
+  moveSelected: (axis, distance) =>
+    set((state) => ({
+      bodies: state.bodies.map((body) => {
+        if (body.id !== state.selectedBodyId) return body;
+        const position = [...body.position] as [number, number, number];
+        const index = axis === "x" ? 0 : axis === "y" ? 1 : 2;
+        position[index] += distance;
+        position[1] = Math.max(0.5, position[1]);
+        return { ...body, position };
+      }),
+    })),
+  rotateSelected: (axis, degrees) =>
+    set((state) => ({
+      bodies: state.bodies.map((body) => {
+        if (body.id !== state.selectedBodyId) return body;
+        const rotation = [...body.rotation] as [number, number, number];
+        const index = axis === "x" ? 0 : axis === "y" ? 1 : 2;
+        rotation[index] += (degrees * Math.PI) / 180;
+        return { ...body, rotation };
+      }),
+    })),
   spawnPreset: (preset) =>
     set((state) => {
       const add = (
@@ -316,16 +339,29 @@ export const usePlayground = create<PlaygroundState>((set) => ({
       const pieces =
         preset === "wall"
           ? Array.from({ length: 5 }, (_, index) =>
-              add("box", [(index - 2) * 1.55, 0.1, 0], [1.8, 0.65, 0.7]),
+              add("box", [(index - 2) * 1.55, 0.35, 0], [1.8, 0.65, 0.7]),
             )
           : preset === "floor"
-            ? [add("box", [0, -0.55, 0], [4.8, 0.3, 4.8])]
-            : [
+            ? [add("box", [0, 0.15, 0], [4.8, 0.3, 4.8])]
+            : preset === "pillar"
+              ? [
                 add("cylinder", [-2.6, 1.7, -2.6], [0.9, 3.4, 0.9]),
                 add("cylinder", [2.6, 1.7, -2.6], [0.9, 3.4, 0.9]),
                 add("cylinder", [-2.6, 1.7, 2.6], [0.9, 3.4, 0.9]),
                 add("cylinder", [2.6, 1.7, 2.6], [0.9, 3.4, 0.9]),
-              ];
+              ]
+              : preset === "room"
+                ? [
+                    add("box", [-2.4, 1.2, 0], [0.35, 1.2, 3.2]),
+                    add("box", [2.4, 1.2, 0], [0.35, 1.2, 3.2]),
+                    add("box", [0, 1.2, -2.85], [2.8, 1.2, 0.35]),
+                    add("box", [0, 2.6, 0], [2.8, 0.25, 3.2]),
+                  ]
+                : [
+                    add("box", [0, 0.2, 0], [4.8, 0.3, 1.4]),
+                    add("box", [-3.5, 1.2, 0], [0.35, 1.2, 1.4]),
+                    add("box", [3.5, 1.2, 0], [0.35, 1.2, 1.4]),
+                  ];
       const next = [...state.bodies, ...pieces].slice(-MAX_BODIES);
       const liveIds = new Set(next.map((body) => body.id));
       return {
