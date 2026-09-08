@@ -36,7 +36,17 @@ function Lights() {
 
 function VisualArena() {
   const { resolvedTheme } = useTheme();
-  return <gridHelper args={[32, 64, resolvedTheme === "light" ? "#b9c3d0" : "#3a3f48", resolvedTheme === "light" ? "#d6dce5" : "#262930"]} position={[0, 0, 0]} />;
+  const major = resolvedTheme === "light" ? "#b9c3d0" : "#3a3f48";
+  const minor = resolvedTheme === "light" ? "#d6dce5" : "#262930";
+  return (
+    <>
+      <gridHelper args={[32, 64, major, minor]} position={[0, 0, 0]} />
+      <gridHelper args={[32, 64, major, minor]} rotation={[0, 0, Math.PI / 2]} position={[-16, 8, 0]} />
+      <gridHelper args={[32, 64, major, minor]} rotation={[0, 0, Math.PI / 2]} position={[16, 8, 0]} />
+      <gridHelper args={[32, 64, major, minor]} rotation={[Math.PI / 2, 0, 0]} position={[0, 8, -16]} />
+      <gridHelper args={[32, 64, major, minor]} rotation={[Math.PI / 2, 0, 0]} position={[0, 8, 16]} />
+    </>
+  );
 }
 
 export function PlaygroundCanvas() {

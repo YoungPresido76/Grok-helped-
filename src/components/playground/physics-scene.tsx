@@ -8,7 +8,7 @@ import {
   useRapier,
   type RapierRigidBody,
 } from "@react-three/rapier";
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { CanvasTexture, Color, Euler, Group, MeshStandardMaterial, Plane, Quaternion, SRGBColorSpace, Vector2, Vector3 } from "three";
 import { orbitControlsRef } from "./orbit-controls";
 import { liveBodyPoses, MATERIALS, usePlayground, type ShapeKind, type SpawnedBody } from "./store";
@@ -50,6 +50,10 @@ function PhysicsArena() {
         restitution={Math.max(GROUND_RESTITUTION, groundRestitution)}
       >
         <CuboidCollider args={[16, 0.2, 16]} position={[0, -0.2, 0]} />
+        <CuboidCollider args={[0.2, 8, 16]} position={[-16, 8, 0]} />
+        <CuboidCollider args={[0.2, 8, 16]} position={[16, 8, 0]} />
+        <CuboidCollider args={[16, 8, 0.2]} position={[0, 8, -16]} />
+        <CuboidCollider args={[16, 8, 0.2]} position={[0, 8, 16]} />
       </RigidBody>
     </>
   );
@@ -244,6 +248,7 @@ function RotationGizmo() {
   const rotateBody = usePlayground((s) => s.rotateBody);
   const setDragging = usePlayground((s) => s.setDragging);
   const selected = usePlayground((s) => s.bodies.find((body) => body.id === s.selectedBodyId));
+  const [activeAxis, setActiveAxis] = useState<"x" | "y" | "z" | null>(null);
   const activeRotation = useRef<{
     axis: "x" | "y" | "z";
     pointerId: number;
@@ -265,6 +270,19 @@ function RotationGizmo() {
     group.quaternion.set(rotation.x, rotation.y, rotation.z, rotation.w);
     const distance = camera.position.distanceTo(group.position);
     group.scale.setScalar(Math.max(0.72, Math.min(1.8, distance * 0.11)));
+    const baseExtent = selected.kind === "box" ? 0.42 : selected.kind === "cylinder" || selected.kind === "cone" ? 0.5 : 0.5;
+    const axes = GIZMO_AXES.map(({ axis }) => axis);
+    axes.forEach((axis, index) => {
+      const axisEntry = group.children[index];
+      if (!axisEntry) return;
+      const boundary = baseExtent * selected.scale[index];
+      const direction = GIZMO_AXES[index].end;
+      const line = axisEntry.children[0];
+      const label = axisEntry.children[1];
+      line.position.set(direction[0] * (boundary + 0.575), direction[1] * (boundary + 0.575), direction[2] * (boundary + 0.575));
+      label.position.set(direction[0] * (boundary + 1.15), direction[1] * (boundary + 1.15), direction[2] * (boundary + 1.15));
+      axisEntry.visible = activeAxis === null || activeAxis === axis;
+    });
   });
 
   useEffect(() => {
@@ -282,6 +300,7 @@ function RotationGizmo() {
       event.stopImmediatePropagation();
       event.preventDefault();
       activeRotation.current = { axis, pointerId: event.pointerId, lastX: event.clientX, lastY: event.clientY };
+      setActiveAxis(axis);
       if (orbitControlsRef.current) orbitControlsRef.current.enabled = false;
       setDragging(true);
       el.style.cursor = "grabbing";
@@ -308,6 +327,7 @@ function RotationGizmo() {
       if (!active || event.pointerId !== active.pointerId) return;
       event.stopImmediatePropagation();
       activeRotation.current = null;
+      setActiveAxis(null);
       if (orbitControlsRef.current) orbitControlsRef.current.enabled = true;
       setDragging(false);
       el.style.cursor = "auto";
@@ -353,6 +373,7 @@ function GrabController() {
   const demolitionMode = usePlayground((s) => s.demolitionMode);
   const selectedBodyId = usePlayground((s) => s.selectedBodyId);
   const setSelectedBodyId = usePlayground((s) => s.setSelectedBodyId);
+  const activeTool = usePlayground((s) => s.activeTool);
   const weld = usePlayground((s) => s.weld);
   const unweld = usePlayground((s) => s.unweld);
   const grab = useRef<{
@@ -409,7 +430,10 @@ function GrabController() {
         return;
       }
       const picked = pickDynamic();
-      if (!picked || !picked.body.isValid()) return;
+      if (!picked || !picked.body.isValid()) {
+        if (activeTool === "select" || activeTool === "scale") setSelectedBodyId(null);
+        return;
+      }
 
       event.stopImmediatePropagation();
       event.preventDefault();
@@ -538,6 +562,7 @@ function GrabController() {
     rapier,
     raycaster,
     selectedBodyId,
+    activeTool,
     setDragging,
     setSelectedBodyId,
     weld,
