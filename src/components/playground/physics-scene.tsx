@@ -119,10 +119,10 @@ function ShapeBody({ body, selected }: { body: SpawnedBody; selected: boolean })
       ccd
       canSleep
     >
-      {body.kind === "sphere" && <BallCollider args={[0.46]} density={materialProfile.density} />}
-      {body.kind === "box" && <CuboidCollider args={[0.42, 0.42, 0.42]} density={materialProfile.density} />}
-      {(body.kind === "cylinder" || body.kind === "cone") && <CylinderCollider args={[0.5, 0.38]} density={materialProfile.density} />}
-      {(body.kind === "torus" || body.kind === "capsule") && <BallCollider args={[0.5]} density={materialProfile.density} />}
+      {body.kind === "sphere" && <BallCollider args={[0.46]} density={materialProfile.density} sensor={selected} />}
+      {body.kind === "box" && <CuboidCollider args={[0.42, 0.42, 0.42]} density={materialProfile.density} sensor={selected} />}
+      {(body.kind === "cylinder" || body.kind === "cone") && <CylinderCollider args={[0.5, 0.38]} density={materialProfile.density} sensor={selected} />}
+      {(body.kind === "torus" || body.kind === "capsule") && <BallCollider args={[0.5]} density={materialProfile.density} sensor={selected} />}
       <group visible={body.visible}>
         <mesh castShadow receiveShadow material={material}>
           {body.kind === "sphere" && <sphereGeometry args={[0.46, 32, 24]} />}
