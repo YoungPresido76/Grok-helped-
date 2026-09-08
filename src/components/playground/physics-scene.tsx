@@ -631,6 +631,12 @@ function BodyCuller() {
       const rb = bodyRefs.get(body.id);
       if (!rb || !rb.isValid()) continue;
       const position = rb.translation();
+      const radius = (body.kind === "box" ? 0.42 : body.kind === "cylinder" || body.kind === "cone" ? 0.5 : 0.5) * Math.max(...body.scale);
+      if (position.y < radius) {
+        rb.setTranslation({ x: position.x, y: radius, z: position.z }, true);
+        const velocity = rb.linvel();
+        if (velocity.y < 0) rb.setLinvel({ x: velocity.x, y: 0, z: velocity.z }, true);
+      }
       const rotation = rb.rotation();
       const euler = new Euler().setFromQuaternion(
         new Quaternion(rotation.x, rotation.y, rotation.z, rotation.w),
