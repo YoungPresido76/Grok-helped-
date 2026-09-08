@@ -92,6 +92,7 @@ function ShapeBody({ body }: { body: SpawnedBody }) {
       }}
       position={body.position}
       rotation={body.rotation}
+      scale={body.scale}
       colliders={false}
       restitution={restitution}
       friction={friction}
@@ -184,9 +185,11 @@ function GrabController() {
   const setDragging = usePlayground((s) => s.setDragging);
   const paused = usePlayground((s) => s.paused);
   const weldMode = usePlayground((s) => s.weldMode);
+  const demolitionMode = usePlayground((s) => s.demolitionMode);
   const selectedBodyId = usePlayground((s) => s.selectedBodyId);
   const setSelectedBodyId = usePlayground((s) => s.setSelectedBodyId);
   const weld = usePlayground((s) => s.weld);
+  const unweld = usePlayground((s) => s.unweld);
   const grab = useRef<{
     body: RapierRigidBody;
     offset: Vector3;
@@ -242,11 +245,15 @@ function GrabController() {
       event.stopImmediatePropagation();
       event.preventDefault();
 
-      if (weldMode) {
+      if (weldMode || demolitionMode) {
         const pickedId = bodyIdFor(picked.body);
         if (!pickedId) return;
         if (!selectedBodyId || selectedBodyId === pickedId) {
           setSelectedBodyId(pickedId);
+          return;
+        }
+        if (demolitionMode) {
+          unweld(selectedBodyId, pickedId);
           return;
         }
         const first = bodyRefs.get(selectedBodyId);
@@ -276,6 +283,8 @@ function GrabController() {
         return;
       }
 
+      const pickedId = bodyIdFor(picked.body);
+      if (pickedId) setSelectedBodyId(pickedId);
       picked.body.wakeUp();
       picked.body.setBodyType(rapier.RigidBodyType.KinematicPositionBased, true);
       picked.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
@@ -354,6 +363,8 @@ function GrabController() {
     setDragging,
     setSelectedBodyId,
     weld,
+    unweld,
+    demolitionMode,
     weldMode,
     world,
   ]);

@@ -1,20 +1,34 @@
 import {
+  BookOpen,
   Circle,
+  CircleHelp,
   Cuboid,
   Cylinder,
   FolderOpen,
+  Hammer,
   Link2,
+  Maximize2,
+  Unlink2,
   Pause,
   Play,
+  RotateCw,
   Save,
   Shuffle,
   Trash2,
 } from "lucide-react";
+import { Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { cn } from "@/lib/utils";
-import { usePlayground, type ShapeKind } from "./store";
+import { usePlayground, type PresetKind, type ShapeKind } from "./store";
+
+const TOOLS = [
+  { id: "spawn", label: "Spawn", icon: Hammer, hint: "Add pieces and presets" },
+  { id: "weld", label: "Weld", icon: Link2, hint: "Join nearby pieces" },
+  { id: "demolish", label: "Demolish", icon: Unlink2, hint: "Break a connection" },
+  { id: "scale", label: "Scale", icon: Maximize2, hint: "Select and resize" },
+] as const;
 
 const SHAPES: { kind: ShapeKind; label: string; icon: typeof Circle }[] = [
   { kind: "sphere", label: "Sphere", icon: Circle },
@@ -34,10 +48,15 @@ export function Toolbar() {
   const togglePaused = usePlayground((s) => s.togglePaused);
   const count = usePlayground((s) => s.bodies.length);
   const weldMode = usePlayground((s) => s.weldMode);
+  const demolitionMode = usePlayground((s) => s.demolitionMode);
   const selectedBodyId = usePlayground((s) => s.selectedBodyId);
-  const setWeldMode = usePlayground((s) => s.setWeldMode);
+  const activeTool = usePlayground((s) => s.activeTool);
+  const setActiveTool = usePlayground((s) => s.setActiveTool);
   const saveStructure = usePlayground((s) => s.saveStructure);
   const loadStructure = usePlayground((s) => s.loadStructure);
+  const transformSelected = usePlayground((s) => s.transformSelected);
+  const spawnPreset = usePlayground((s) => s.spawnPreset);
+  const selected = usePlayground((s) => s.selectedBodyId !== null);
   const [status, setStatus] = useState<string | null>(null);
 
   useEffect(() => {
@@ -62,6 +81,18 @@ export function Toolbar() {
           <p className="mt-0.5 text-xs text-muted sm:text-sm">Physics playground</p>
         </div>
         <div className="pointer-events-auto flex items-center gap-2">
+          <Link
+            to="/tutorial"
+            className="hidden items-center gap-1.5 rounded-sm border border-border bg-surface px-3 py-2 text-xs font-semibold text-muted hover:text-fg sm:inline-flex"
+          >
+            <BookOpen className="size-4" /> Guide
+          </Link>
+          <Link
+            to="/faq"
+            className="hidden items-center gap-1.5 rounded-sm border border-border bg-surface px-3 py-2 text-xs font-semibold text-muted hover:text-fg sm:inline-flex"
+          >
+            <CircleHelp className="size-4" /> FAQ
+          </Link>
           <p className="rounded-sm border border-border bg-surface px-3 py-2 text-xs font-medium tabular-nums text-muted">
             <span className="text-fg">{count}</span> bodies
           </p>
@@ -88,7 +119,29 @@ export function Toolbar() {
           )}
         >
           <div className="flex flex-wrap items-center gap-2">
-            {SHAPES.map(({ kind, label, icon: Icon }) => (
+            <div className="w-full rounded-sm border border-border bg-surface-2 p-1">
+              <div className="grid grid-cols-2 gap-1 sm:grid-cols-4">
+                {TOOLS.map(({ id, label, icon: Icon, hint }) => (
+                  <button
+                    key={id}
+                    type="button"
+                    className={cn(
+                      "flex min-h-11 items-center justify-center gap-2 rounded-sm px-2 py-2 text-xs font-semibold transition-colors",
+                      activeTool === id
+                        ? "bg-accent text-accent-fg"
+                        : "text-muted hover:bg-border hover:text-fg",
+                    )}
+                    onClick={() => setActiveTool(id)}
+                    aria-pressed={activeTool === id}
+                    title={hint}
+                  >
+                    <Icon className="size-4" strokeWidth={1.75} />
+                    <span>{label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+            {activeTool === "spawn" && SHAPES.map(({ kind, label, icon: Icon }) => (
               <Button
                 key={kind}
                 variant="muted"
@@ -99,20 +152,10 @@ export function Toolbar() {
                 <span>{label}</span>
               </Button>
             ))}
-            <Button variant="muted" onClick={scatter} aria-label="Scatter mixed shapes">
+            {activeTool === "spawn" && <Button variant="muted" onClick={scatter} aria-label="Scatter mixed shapes">
               <Shuffle className="size-4" strokeWidth={1.75} />
               <span>Scatter</span>
-            </Button>
-            <Button
-              variant={weldMode ? "solid" : "muted"}
-              onClick={() => setWeldMode(!weldMode)}
-              aria-pressed={weldMode}
-              aria-label={weldMode ? "Exit weld mode" : "Enter weld mode"}
-              title="Select two nearby bodies to weld them together"
-            >
-              <Link2 className="size-4" strokeWidth={1.75} />
-              <span>{weldMode ? "Welding…" : "Weld"}</span>
-            </Button>
+            </Button>}
             <Button
               variant="ghost"
               onClick={clear}
@@ -152,14 +195,53 @@ export function Toolbar() {
               onValueChange={setRestitution}
             />
           </div>
-          {weldMode && (
+          {(weldMode || demolitionMode) && (
             <p className="text-xs text-muted" role="status">
-              {selectedBodyId
-                ? "Now click a nearby body to snap and weld it."
-                : "Click one body, then another nearby body to weld them together."}
+              {demolitionMode
+                ? selectedBodyId
+                  ? "Now click the connected body to break their weld."
+                  : "Click one body, then the connected body whose weld you want to break."
+                : selectedBodyId
+                  ? "Now click a nearby body to snap and weld it."
+                  : "Click one body, then another nearby body to weld them together."}
             </p>
           )}
           {status && <p className="text-xs text-muted" role="status">{status}</p>}
+          <div className="flex flex-wrap items-center gap-2 border-t border-border pt-3">
+            <span className="mr-1 text-xs font-medium text-muted">Piece tools</span>
+            <Button
+              variant="muted"
+              disabled={!selected}
+              onClick={() => transformSelected(Math.PI / 12, 1)}
+              aria-label="Rotate selected piece clockwise"
+            >
+              <RotateCw className="size-4" strokeWidth={1.75} />
+              <span>Rotate</span>
+            </Button>
+            <Button
+              variant="muted"
+              disabled={!selected}
+              onClick={() => transformSelected(0, 1.15)}
+              aria-label="Scale selected piece up"
+            >
+              <Maximize2 className="size-4" strokeWidth={1.75} />
+              <span>Grow</span>
+            </Button>
+            <Button
+              variant="muted"
+              disabled={!selected}
+              onClick={() => transformSelected(0, 0.87)}
+              aria-label="Scale selected piece down"
+            >
+              <Maximize2 className="size-4 rotate-180" strokeWidth={1.75} />
+              <span>Shrink</span>
+            </Button>
+            {(["wall", "floor", "pillar"] as PresetKind[]).map((preset) => (
+              <Button key={preset} variant="ghost" onClick={() => spawnPreset(preset)}>
+                <span>{preset[0].toUpperCase() + preset.slice(1)}</span>
+              </Button>
+            ))}
+          </div>
         </div>
       </div>
     </div>
