@@ -11,6 +11,12 @@ export type SpawnedBody = {
   angularVelocity: [number, number, number];
 };
 
+export type Weld = {
+  id: string;
+  bodyA: string;
+  bodyB: string;
+};
+
 const MAX_BODIES = 72;
 
 const PALETTES: Record<ShapeKind, string[]> = {
@@ -70,14 +76,20 @@ function demoPile(): SpawnedBody[] {
 
 type PlaygroundState = {
   bodies: SpawnedBody[];
+  welds: Weld[];
   gravity: number;
   restitution: number;
   paused: boolean;
   dragging: boolean;
+  weldMode: boolean;
+  selectedBodyId: string | null;
   spawn: (kind: ShapeKind, position?: [number, number, number]) => void;
   scatter: () => void;
   remove: (id: string) => void;
   clear: () => void;
+  weld: (bodyA: string, bodyB: string) => void;
+  setWeldMode: (value: boolean) => void;
+  setSelectedBodyId: (id: string | null) => void;
   setGravity: (value: number) => void;
   setRestitution: (value: number) => void;
   togglePaused: () => void;
@@ -86,17 +98,24 @@ type PlaygroundState = {
 
 export const usePlayground = create<PlaygroundState>((set) => ({
   bodies: demoPile(),
+  welds: [],
   gravity: 9.81,
   // Most everyday materials lose almost all of their impact energy. Users
   // can still raise this with the Bounce control for deliberately bouncy scenes.
   restitution: 0.08,
   paused: false,
   dragging: false,
+  weldMode: false,
+  selectedBodyId: null,
   spawn: (kind, position) =>
     set((state) => {
       const next = [...state.bodies, makeBody(kind, position)];
       if (next.length > MAX_BODIES) next.splice(0, next.length - MAX_BODIES);
-      return { bodies: next };
+      const liveIds = new Set(next.map((body) => body.id));
+      return {
+        bodies: next,
+        welds: state.welds.filter((weld) => liveIds.has(weld.bodyA) && liveIds.has(weld.bodyB)),
+      };
     }),
   scatter: () =>
     set((state) => {
@@ -113,11 +132,35 @@ export const usePlayground = create<PlaygroundState>((set) => ({
       });
       const next = [...state.bodies, ...extra];
       if (next.length > MAX_BODIES) next.splice(0, next.length - MAX_BODIES);
-      return { bodies: next };
+      const liveIds = new Set(next.map((body) => body.id));
+      return {
+        bodies: next,
+        welds: state.welds.filter((weld) => liveIds.has(weld.bodyA) && liveIds.has(weld.bodyB)),
+      };
     }),
   remove: (id) =>
-    set((state) => ({ bodies: state.bodies.filter((body) => body.id !== id) })),
-  clear: () => set({ bodies: [] }),
+    set((state) => ({
+      bodies: state.bodies.filter((body) => body.id !== id),
+      welds: state.welds.filter((weld) => weld.bodyA !== id && weld.bodyB !== id),
+      selectedBodyId: state.selectedBodyId === id ? null : state.selectedBodyId,
+    })),
+  clear: () => set({ bodies: [], welds: [], selectedBodyId: null }),
+  weld: (bodyA, bodyB) =>
+    set((state) => {
+      if (bodyA === bodyB) return state;
+      const exists = state.welds.some(
+        (weld) =>
+          (weld.bodyA === bodyA && weld.bodyB === bodyB) ||
+          (weld.bodyA === bodyB && weld.bodyB === bodyA),
+      );
+      if (exists) return { selectedBodyId: null };
+      return {
+        welds: [...state.welds, { id: `weld-${bodyA}-${bodyB}`, bodyA, bodyB }],
+        selectedBodyId: null,
+      };
+    }),
+  setWeldMode: (value) => set({ weldMode: value, selectedBodyId: null }),
+  setSelectedBodyId: (id) => set({ selectedBodyId: id }),
   setGravity: (value) => set({ gravity: value }),
   setRestitution: (value) => set({ restitution: value }),
   togglePaused: () => set((state) => ({ paused: !state.paused })),

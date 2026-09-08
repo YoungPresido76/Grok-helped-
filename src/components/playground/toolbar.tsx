@@ -1,4 +1,4 @@
-import { Cuboid, Circle, Cylinder, Pause, Play, Shuffle, Trash2 } from "lucide-react";
+import { Circle, Cuboid, Cylinder, Link2, Pause, Play, Shuffle, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { cn } from "@/lib/utils";
@@ -21,6 +21,9 @@ export function Toolbar() {
   const paused = usePlayground((s) => s.paused);
   const togglePaused = usePlayground((s) => s.togglePaused);
   const count = usePlayground((s) => s.bodies.length);
+  const weldMode = usePlayground((s) => s.weldMode);
+  const selectedBodyId = usePlayground((s) => s.selectedBodyId);
+  const setWeldMode = usePlayground((s) => s.setWeldMode);
 
   return (
     <div className="pointer-events-none absolute inset-0 flex flex-col justify-between p-3 pt-[max(0.75rem,env(safe-area-inset-top))] pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:p-5">
@@ -74,6 +77,16 @@ export function Toolbar() {
               <span>Scatter</span>
             </Button>
             <Button
+              variant={weldMode ? "solid" : "muted"}
+              onClick={() => setWeldMode(!weldMode)}
+              aria-pressed={weldMode}
+              aria-label={weldMode ? "Exit weld mode" : "Enter weld mode"}
+              title="Select two nearby bodies to weld them together"
+            >
+              <Link2 className="size-4" strokeWidth={1.75} />
+              <span>{weldMode ? "Welding…" : "Weld"}</span>
+            </Button>
+            <Button
               variant="ghost"
               onClick={clear}
               className="sm:ml-auto"
@@ -104,6 +117,13 @@ export function Toolbar() {
               onValueChange={setRestitution}
             />
           </div>
+          {weldMode && (
+            <p className="text-xs text-muted" role="status">
+              {selectedBodyId
+                ? "Now click a nearby body to snap and weld it."
+                : "Click one body, then another nearby body to weld them together."}
+            </p>
+          )}
         </div>
       </div>
     </div>
