@@ -25,6 +25,24 @@
 }
 
 @layer base {
+  html.light {
+    --color-bg: #f3f5f8;
+    --color-surface: #ffffff;
+    --color-surface-2: #e8ecf2;
+    --color-fg: #18202a;
+    --color-muted: #5d6876;
+    --color-subtle: #7f8995;
+    --color-accent: #25364d;
+    --color-accent-fg: #f7f9fc;
+    --color-border: #ccd4df;
+    --color-danger: #b24d42;
+    color-scheme: light;
+  }
+
+  html.dark {
+    color-scheme: dark;
+  }
+
   html {
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;

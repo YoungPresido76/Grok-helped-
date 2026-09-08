@@ -1,6 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { ArrowLeft, BookOpen, CircleHelp } from "lucide-react";
 import { createFileRoute } from "@tanstack/react-router";
+import { ThemeSelect } from "@/components/theme-select";
 
 export const Route = createFileRoute("/faq")({ component: FaqPage });
 
@@ -10,6 +11,8 @@ const questions = [
   ["What do the X, Y, and Z gizmo labels mean?", "X is the red axis, Y is the green axis, and Z is the blue axis. The labels are attached to the selected piece, so they rotate with it and show which local axis each ring controls."],
   ["How do I rotate something with a gesture?", "With a piece selected, drag one of the colored axis rings. Horizontal or vertical pointer movement turns the piece continuously, giving you a full 360-degree rotation gesture. Orbit the camera by dragging outside the gizmo."],
   ["How do I make a rectangle upright again?", "Open Select and press Upright. This resets the selected piece's X and Z tilt while keeping its Y heading, so a rectangle lying on its side returns to a normal upright construction orientation."],
+  ["Does Dropyard have Blender-style shortcuts?", "Yes, in a simplified form. G or R switches to Select, S switches to Scale, U applies Upright, and X, Y, or Z rotates the selected piece 15 degrees around that axis. The on-screen controls remain available when you prefer clicking or touch gestures."],
+  ["How do I change the theme?", "Use the theme selector in the top HUD or on the guide and FAQ pages. System follows your device preference, Light uses a bright workspace, and Dark uses the original low-light workspace. Your choice is saved on this device."],
   ["Why did an object used to fall when I moved or rotated it?", "Earlier editing handed the body back to dynamic physics as soon as the pointer was released. The current editor keeps the selected body kinematic during editing; use Lock in place when you want it to remain fixed even after you select another piece."],
   ["Why did my weld not work?", "Welding requires the two pieces to be close enough—roughly 2.4 world units. Move them nearer, switch to Weld, and try again. Weld mode also snaps the second piece into a stable position."],
   ["What does Demolish remove?", "Demolish removes only the fixed joint between the two selected bodies. It does not delete either body or any other welds, so the rest of your structure remains intact."],
@@ -27,9 +30,10 @@ function FaqPage() {
           <Link to="/" className="inline-flex items-center gap-2 text-sm font-semibold text-muted hover:text-fg">
             <ArrowLeft className="size-4" /> Back to playground
           </Link>
-          <Link to="/tutorial" className="inline-flex items-center gap-2 text-sm font-semibold text-muted hover:text-fg">
-            <BookOpen className="size-4" /> Tutorial
-          </Link>
+          <div className="flex items-center gap-3">
+            <ThemeSelect />
+            <Link to="/tutorial" className="inline-flex items-center gap-2 text-sm font-semibold text-muted hover:text-fg"><BookOpen className="size-4" /> Tutorial</Link>
+          </div>
         </nav>
         <header className="max-w-2xl">
           <p className="mb-3 inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-accent"><CircleHelp className="size-4" /> Help center</p>

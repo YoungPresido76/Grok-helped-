@@ -1,6 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { ArrowLeft, Box, CircleHelp, Hammer, Link2, RotateCcw, Save, Unlink2 } from "lucide-react";
 import { createFileRoute } from "@tanstack/react-router";
+import { ThemeSelect } from "@/components/theme-select";
 
 export const Route = createFileRoute("/tutorial")({ component: TutorialPage });
 
@@ -35,6 +36,11 @@ const steps = [
     title: "Remodel safely",
     body: "Choose Demolish, select two connected bodies, and their shared weld is removed. The pieces stay in the scene, so you can reuse them instead of starting over.",
   },
+  {
+    icon: Save,
+    title: "Use shortcuts and themes",
+    body: "For a Blender-like flow, press G or R for Select, S for Scale, U for Upright, and X/Y/Z to rotate the selected piece around an axis. Use the theme selector to choose System, Light, or Dark; your preference is saved on this device.",
+  },
 ];
 
 function TutorialPage() {
@@ -45,9 +51,10 @@ function TutorialPage() {
           <Link to="/" className="inline-flex items-center gap-2 text-sm font-semibold text-muted hover:text-fg">
             <ArrowLeft className="size-4" /> Back to playground
           </Link>
-          <Link to="/faq" className="inline-flex items-center gap-2 text-sm font-semibold text-muted hover:text-fg">
-            <CircleHelp className="size-4" /> FAQ
-          </Link>
+          <div className="flex items-center gap-3">
+            <ThemeSelect />
+            <Link to="/faq" className="inline-flex items-center gap-2 text-sm font-semibold text-muted hover:text-fg"><CircleHelp className="size-4" /> FAQ</Link>
+          </div>
         </nav>
         <header className="max-w-2xl">
           <p className="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-accent">Dropyard guide</p>

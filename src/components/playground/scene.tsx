@@ -3,16 +3,19 @@ import { lazy, Suspense } from "react";
 import { ACESFilmicToneMapping, PCFShadowMap } from "three";
 import { CameraControls } from "./orbit-controls";
 import { usePlayground } from "./store";
+import { useTheme } from "@/contexts/theme";
 
 const PhysicsScene = lazy(() => import("./physics-scene"));
 
 function Lights() {
+  const { resolvedTheme } = useTheme();
+  const light = resolvedTheme === "light";
   return (
     <>
-      <color attach="background" args={["#0c0d0f"]} />
-      <fog attach="fog" args={["#0c0d0f", 16, 38]} />
-      <hemisphereLight args={["#d8dbe2", "#1a1c20", 0.55]} />
-      <ambientLight intensity={0.28} />
+      <color attach="background" args={[light ? "#f3f5f8" : "#0c0d0f"]} />
+      <fog attach="fog" args={[light ? "#f3f5f8" : "#0c0d0f", 16, 38]} />
+      <hemisphereLight args={light ? ["#ffffff", "#aeb9c8", 0.72] : ["#d8dbe2", "#1a1c20", 0.55]} />
+      <ambientLight intensity={light ? 0.5 : 0.28} />
       <directionalLight
         position={[8.5, 14, 6]}
         intensity={1.55}
@@ -26,19 +29,20 @@ function Lights() {
         shadow-camera-bottom={-12}
         shadow-bias={-0.0004}
       />
-      <directionalLight position={[-7, 6, -5]} intensity={0.32} color="#9aa6b4" />
+      <directionalLight position={[-7, 6, -5]} intensity={light ? 0.5 : 0.32} color="#9aa6b4" />
     </>
   );
 }
 
 function VisualArena() {
-  return (
-    <gridHelper args={[32, 64, "#3a3f48", "#262930"]} position={[0, 0, 0]} />
-  );
+  const { resolvedTheme } = useTheme();
+  return <gridHelper args={[32, 64, resolvedTheme === "light" ? "#b9c3d0" : "#3a3f48", resolvedTheme === "light" ? "#d6dce5" : "#262930"]} position={[0, 0, 0]} />;
 }
 
 export function PlaygroundCanvas() {
   const dragging = usePlayground((s) => s.dragging);
+  const { resolvedTheme } = useTheme();
+  const background = resolvedTheme === "light" ? "#f3f5f8" : "#0c0d0f";
 
   return (
     <Canvas
@@ -53,7 +57,7 @@ export function PlaygroundCanvas() {
         toneMappingExposure: 1.08,
       }}
       onCreated={({ gl }) => {
-        gl.setClearColor("#0c0d0f");
+        gl.setClearColor(background);
         gl.shadowMap.enabled = true;
         gl.shadowMap.type = PCFShadowMap;
       }}

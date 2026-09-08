@@ -8,6 +8,9 @@ export function Playground() {
   const scatter = usePlayground((s) => s.scatter);
   const clear = usePlayground((s) => s.clear);
   const togglePaused = usePlayground((s) => s.togglePaused);
+  const setActiveTool = usePlayground((s) => s.setActiveTool);
+  const uprightSelected = usePlayground((s) => s.uprightSelected);
+  const rotateSelected = usePlayground((s) => s.rotateSelected);
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -27,9 +30,30 @@ export function Playground() {
         spawn(kind);
         return;
       }
-      if (event.code === "Digit4" || event.code === "KeyR") {
+      if (event.code === "Digit4") {
         event.preventDefault();
         scatter();
+        return;
+      }
+      if (event.code === "KeyG" || event.code === "KeyR") {
+        event.preventDefault();
+        setActiveTool("select");
+        return;
+      }
+      if (event.code === "KeyS") {
+        event.preventDefault();
+        setActiveTool("scale");
+        return;
+      }
+      if (event.code === "KeyU") {
+        event.preventDefault();
+        uprightSelected();
+        return;
+      }
+      const axis = event.code === "KeyX" ? "x" : event.code === "KeyY" ? "y" : event.code === "KeyZ" ? "z" : null;
+      if (axis) {
+        event.preventDefault();
+        rotateSelected(axis, 15);
         return;
       }
       if (event.code === "KeyC" || event.code === "Delete" || event.code === "Backspace") {
@@ -44,7 +68,7 @@ export function Playground() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [clear, scatter, spawn, togglePaused]);
+  }, [clear, rotateSelected, scatter, setActiveTool, spawn, togglePaused, uprightSelected]);
 
   return (
     <main className="relative h-dvh w-full overflow-hidden bg-bg text-fg">

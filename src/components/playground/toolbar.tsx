@@ -29,6 +29,7 @@ import {
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
+import { ThemeSelect } from "@/components/theme-select";
 import { cn } from "@/lib/utils";
 import {
   MATERIALS,
@@ -111,6 +112,7 @@ export function Toolbar() {
         </div>
         <div className="pointer-events-auto flex items-center gap-2">
           <p className="rounded-sm border border-border bg-surface/90 px-3 py-2 text-xs font-medium tabular-nums text-muted backdrop-blur-sm"><span className="text-fg">{count}</span> bodies</p>
+          <ThemeSelect />
           <Button variant="muted" size="icon" onClick={togglePaused} aria-label={paused ? "Resume simulation" : "Pause simulation"}>{paused ? <Play className="size-4" /> : <Pause className="size-4" />}</Button>
         </div>
       </header>
@@ -146,6 +148,7 @@ export function Toolbar() {
               <div className="flex flex-wrap gap-2"><span className="self-center text-xs font-semibold text-muted">Move</span><Button variant="muted" disabled={!selected} onClick={() => moveSelected("x", -0.25)}><ArrowLeft className="size-4" />X−</Button><Button variant="muted" disabled={!selected} onClick={() => moveSelected("x", 0.25)}><ArrowRight className="size-4" />X+</Button><Button variant="muted" disabled={!selected} onClick={() => moveSelected("y", 0.25)}><ArrowUp className="size-4" />Y+</Button><Button variant="muted" disabled={!selected} onClick={() => moveSelected("y", -0.25)}><ArrowDown className="size-4" />Y−</Button><Button variant="muted" disabled={!selected} onClick={() => moveSelected("z", -0.25)}>Z−</Button><Button variant="muted" disabled={!selected} onClick={() => moveSelected("z", 0.25)}>Z+</Button></div>
               <div className="flex flex-wrap gap-2"><span className="self-center text-xs font-semibold text-muted">Rotate</span>{(["x", "y", "z"] as const).map((axis) => <span key={axis} className="inline-flex gap-1 rounded-sm border border-border bg-surface-2 p-1"><Button variant="ghost" disabled={!selected} onClick={() => rotateSelected(axis, -15)} aria-label={`Rotate selected around ${axis.toUpperCase()} by minus 15 degrees`}>{axis.toUpperCase()}−</Button><Button variant="ghost" disabled={!selected} onClick={() => rotateSelected(axis, 15)} aria-label={`Rotate selected around ${axis.toUpperCase()} by plus 15 degrees`}>{axis.toUpperCase()}+</Button></span>)}<Button variant="muted" disabled={!selected} onClick={uprightSelected}><RotateCcw className="size-4" />Upright</Button><Button variant="muted" disabled={!selected} onClick={() => transformSelected(Math.PI / 12, 1)}><RotateCw className="size-4" />Turn 15°</Button><Button variant="muted" disabled={!selected} onClick={() => transformSelected(0, 1.15)}><Maximize2 className="size-4" />Grow</Button><Button variant="muted" disabled={!selected} onClick={() => transformSelected(0, 0.87)}><Maximize2 className="size-4 rotate-180" />Shrink</Button></div>
               <p className="text-xs leading-5 text-muted">Drag the red X, green Y, or blue Z ring around the selected piece for free 360° rotation. Selection stays held in place while you edit.</p>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-subtle">Shortcuts: G move · R rotate · S scale · U upright · X / Y / Z rotate axis</p>
               {!selected && <p className="text-xs text-muted">Click an object in the scene first.</p>}
             </div>
           )}
