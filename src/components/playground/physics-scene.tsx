@@ -16,6 +16,8 @@ import { usePlayground, type ShapeKind, type SpawnedBody } from "./store";
 const GRAB_Y_MIN = 0.55;
 const ARENA_RADIUS = 14;
 const FALL_KILL = -8;
+const GROUND_RESTITUTION = 0.04;
+const GROUND_FRICTION = 0.92;
 
 const pointerNdc = new Vector2();
 const grabPlane = new Plane();
@@ -30,12 +32,23 @@ const bodyRefs = new Map<string, RapierRigidBody>();
 
 function PhysicsArena() {
   const restitution = usePlayground((s) => s.restitution);
+  const groundRestitution = Math.min(restitution, 0.18);
   return (
     <>
-      <RigidBody type="fixed" colliders={false} friction={0.85} restitution={restitution}>
+      <RigidBody
+        type="fixed"
+        colliders={false}
+        friction={GROUND_FRICTION}
+        restitution={Math.max(GROUND_RESTITUTION, groundRestitution)}
+      >
         <CuboidCollider args={[16, 0.2, 16]} position={[0, -1.2, 0]} />
       </RigidBody>
-      <RigidBody type="fixed" colliders={false} friction={0.72} restitution={restitution}>
+      <RigidBody
+        type="fixed"
+        colliders={false}
+        friction={0.82}
+        restitution={Math.max(GROUND_RESTITUTION, groundRestitution)}
+      >
         <CylinderCollider args={[0.25, 6.5]} />
       </RigidBody>
     </>
@@ -58,7 +71,9 @@ function ShapeBody({ body }: { body: SpawnedBody }) {
     () => shapeMaterial(body.kind, body.color),
     [body.kind, body.color],
   );
-  const friction = body.kind === "sphere" ? 0.28 : body.kind === "box" ? 0.72 : 0.5;
+  const friction = body.kind === "sphere" ? 0.58 : body.kind === "box" ? 0.82 : 0.68;
+  const linearDamping = body.kind === "sphere" ? 0.3 : 0.24;
+  const angularDamping = body.kind === "sphere" ? 0.62 : 0.48;
 
   useEffect(() => () => material.dispose(), [material]);
 
@@ -73,8 +88,8 @@ function ShapeBody({ body }: { body: SpawnedBody }) {
       colliders={false}
       restitution={restitution}
       friction={friction}
-      linearDamping={0.12}
-      angularDamping={0.16}
+      linearDamping={linearDamping}
+      angularDamping={angularDamping}
       angularVelocity={body.angularVelocity}
       ccd
       canSleep
@@ -298,8 +313,8 @@ export default function PhysicsScene() {
       timeStep={1 / 60}
       interpolate
       paused={paused}
-      numSolverIterations={8}
-      numInternalPgsIterations={2}
+      numSolverIterations={10}
+      numInternalPgsIterations={4}
       maxCcdSubsteps={2}
     >
       <PhysicsArena />

@@ -51,7 +51,9 @@ export function makeBody(
     ],
     rotation: [rand(-0.35, 0.35), rand(-Math.PI, Math.PI), rand(-0.35, 0.35)],
     color: pick(PALETTES[kind]),
-    angularVelocity: [rand(-1.2, 1.2), rand(-1.6, 1.6), rand(-1.2, 1.2)],
+    // A small initial spin gives the pile life without making every piece
+    // tumble like a rubber toy when it lands.
+    angularVelocity: [rand(-0.28, 0.28), rand(-0.4, 0.4), rand(-0.28, 0.28)],
   };
 }
 
@@ -85,7 +87,9 @@ type PlaygroundState = {
 export const usePlayground = create<PlaygroundState>((set) => ({
   bodies: demoPile(),
   gravity: 9.81,
-  restitution: 0.38,
+  // Most everyday materials lose almost all of their impact energy. Users
+  // can still raise this with the Bounce control for deliberately bouncy scenes.
+  restitution: 0.08,
   paused: false,
   dragging: false,
   spawn: (kind, position) =>
