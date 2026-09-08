@@ -1,0 +1,7 @@
+node_modules/
+.vercel/
+.grok/preview.log
+.grok/preview.pid
+.grok/status
+.DS_Store
+*.local

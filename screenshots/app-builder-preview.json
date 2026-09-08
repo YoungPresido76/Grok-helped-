@@ -1,0 +1,36 @@
+{
+  "url": "http://127.0.0.1:8080/",
+  "viewports": {
+    "desktop": {
+      "width": 1280,
+      "height": 800,
+      "status": 200,
+      "title": "Dropyard",
+      "hasCanvas": false,
+      "bodyTextLen": 161,
+      "bodyTextHash": "1aad41fc9caeafd80f4f1f8b50b1dea42ef1f0283ea957b8ad24b16c0baa0a4a",
+      "bodyTextPrefix": "Dropyard Physics playground 6 bodies Drag a body to throw it. Or",
+      "horizontalOverflow": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "screenshot": "/workspace/screenshots/app-builder-preview.png"
+    },
+    "mobile": {
+      "width": 390,
+      "height": 844,
+      "status": 200,
+      "title": "Dropyard",
+      "hasCanvas": false,
+      "bodyTextLen": 94,
+      "bodyTextHash": "5e8039fdcb559c8934c1a404b355ff0a2a76ee193a879bea612c037ec4498164",
+      "bodyTextPrefix": "Dropyard Physics playground 6 bodies Sphere Box Cylinder Scatter",
+      "horizontalOverflow": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "screenshot": "/workspace/screenshots/app-builder-preview-mobile.png"
+    }
+  },
+  "brandWarnings": [],
+  "authWarnings": [],
+  "verdictFile": "/workspace/screenshots/app-builder-preview.json"
+}
