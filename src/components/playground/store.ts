@@ -7,6 +7,7 @@ export type SpawnedBody = {
   kind: ShapeKind;
   position: [number, number, number];
   rotation: [number, number, number];
+  scale: [number, number, number];
   color: string;
   angularVelocity: [number, number, number];
 };
@@ -25,6 +26,8 @@ export type SavedStructure = {
   gravity: number;
   restitution: number;
 };
+
+export type PresetKind = "wall" | "floor" | "pillar";
 
 export const STRUCTURE_STORAGE_KEY = "dropyard.structure.v1";
 export const liveBodyPoses = new Map<
@@ -86,7 +89,13 @@ function parseSavedStructure(raw: string | null): SavedStructure | null {
         isTuple(body.angularVelocity, 3) &&
         typeof body.color === "string",
     );
-    const ids = new Set(bodies.map((body) => body.id));
+    const normalizedBodies = bodies.map((body) => ({
+      ...body,
+      scale: isTuple((body as SpawnedBody & { scale?: unknown }).scale, 3)
+        ? (body as SpawnedBody).scale
+        : ([1, 1, 1] as [number, number, number]),
+    }));
+    const ids = new Set(normalizedBodies.map((body) => body.id));
     const welds = value.welds.filter(
       (weld): weld is Weld =>
         Boolean(weld) &&
@@ -100,7 +109,7 @@ function parseSavedStructure(raw: string | null): SavedStructure | null {
     return {
       version: 1,
       savedAt: typeof value.savedAt === "string" ? value.savedAt : new Date().toISOString(),
-      bodies,
+      bodies: normalizedBodies,
       welds,
       gravity: Math.max(0, Math.min(20, value.gravity)),
       restitution: Math.max(0, Math.min(1, value.restitution)),
@@ -126,6 +135,7 @@ export function makeBody(
       Math.sin(angle) * radius,
     ],
     rotation: [rand(-0.35, 0.35), rand(-Math.PI, Math.PI), rand(-0.35, 0.35)],
+    scale: [1, 1, 1],
     color: pick(PALETTES[kind]),
     // A small initial spin gives the pile life without making every piece
     // tumble like a rubber toy when it lands.
@@ -165,6 +175,8 @@ type PlaygroundState = {
     position: [number, number, number],
     rotation?: [number, number, number],
   ) => void;
+  transformSelected: (rotationDelta: number, scaleFactor: number) => void;
+  spawnPreset: (preset: PresetKind) => void;
   saveStructure: () => boolean;
   loadStructure: () => boolean;
   setGravity: (value: number) => void;
@@ -244,6 +256,54 @@ export const usePlayground = create<PlaygroundState>((set) => ({
         body.id === id ? { ...body, position, ...(rotation ? { rotation } : {}) } : body,
       ),
     })),
+  transformSelected: (rotationDelta, scaleFactor) =>
+    set((state) => ({
+      bodies: state.bodies.map((body) =>
+        body.id === state.selectedBodyId
+          ? {
+              ...body,
+              rotation: [body.rotation[0], body.rotation[1] + rotationDelta, body.rotation[2]],
+              scale: body.scale.map((value) => Math.max(0.25, Math.min(4, value * scaleFactor))) as [
+                number,
+                number,
+                number,
+              ],
+            }
+          : body,
+      ),
+    })),
+  spawnPreset: (preset) =>
+    set((state) => {
+      const add = (
+        kind: ShapeKind,
+        position: [number, number, number],
+        scale: [number, number, number],
+      ) => ({
+        ...makeBody(kind, position),
+        scale,
+        rotation: [0, 0, 0] as [number, number, number],
+        angularVelocity: [0, 0, 0] as [number, number, number],
+      });
+      const pieces =
+        preset === "wall"
+          ? Array.from({ length: 5 }, (_, index) =>
+              add("box", [(index - 2) * 1.55, 0.1, 0], [1.8, 0.65, 0.7]),
+            )
+          : preset === "floor"
+            ? [add("box", [0, -0.55, 0], [4.8, 0.3, 4.8])]
+            : [
+                add("cylinder", [-2.6, 1.7, -2.6], [0.9, 3.4, 0.9]),
+                add("cylinder", [2.6, 1.7, -2.6], [0.9, 3.4, 0.9]),
+                add("cylinder", [-2.6, 1.7, 2.6], [0.9, 3.4, 0.9]),
+                add("cylinder", [2.6, 1.7, 2.6], [0.9, 3.4, 0.9]),
+              ];
+      const next = [...state.bodies, ...pieces].slice(-MAX_BODIES);
+      const liveIds = new Set(next.map((body) => body.id));
+      return {
+        bodies: next,
+        welds: state.welds.filter((weld) => liveIds.has(weld.bodyA) && liveIds.has(weld.bodyB)),
+      };
+    }),
   saveStructure: () => {
     if (typeof window === "undefined") return false;
     const state = usePlayground.getState();

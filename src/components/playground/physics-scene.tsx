@@ -92,6 +92,7 @@ function ShapeBody({ body }: { body: SpawnedBody }) {
       }}
       position={body.position}
       rotation={body.rotation}
+      scale={body.scale}
       colliders={false}
       restitution={restitution}
       friction={friction}
@@ -276,6 +277,8 @@ function GrabController() {
         return;
       }
 
+      const pickedId = bodyIdFor(picked.body);
+      if (pickedId) setSelectedBodyId(pickedId);
       picked.body.wakeUp();
       picked.body.setBodyType(rapier.RigidBodyType.KinematicPositionBased, true);
       picked.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
