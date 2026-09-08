@@ -1,6 +1,7 @@
 import { create } from "zustand";
 
 export type ShapeKind = "sphere" | "box" | "cylinder";
+export type MaterialKind = "wood" | "steel" | "glass";
 
 export type SpawnedBody = {
   id: string;
@@ -8,6 +9,7 @@ export type SpawnedBody = {
   position: [number, number, number];
   rotation: [number, number, number];
   scale: [number, number, number];
+  material: MaterialKind;
   color: string;
   angularVelocity: [number, number, number];
 };
@@ -42,6 +44,12 @@ const PALETTES: Record<ShapeKind, string[]> = {
   sphere: ["#c56a4a", "#d07a58", "#b85c40", "#a8523a"],
   box: ["#3d6b6a", "#4a7c74", "#355e62", "#2f5850"],
   cylinder: ["#bba57e", "#c9b48a", "#a8946c", "#9a8662"],
+};
+
+export const MATERIALS: Record<MaterialKind, { label: string; density: number; friction: number; restitution: number; color: string }> = {
+  wood: { label: "Wood", density: 0.65, friction: 0.82, restitution: 0.08, color: "#b8794f" },
+  steel: { label: "Steel", density: 7.8, friction: 0.48, restitution: 0.03, color: "#71808a" },
+  glass: { label: "Glass", density: 2.5, friction: 0.24, restitution: 0.12, color: "#8fc8d6" },
 };
 
 let seq = 0;
@@ -95,6 +103,7 @@ function parseSavedStructure(raw: string | null): SavedStructure | null {
       scale: isTuple((body as SpawnedBody & { scale?: unknown }).scale, 3)
         ? (body as SpawnedBody).scale
         : ([1, 1, 1] as [number, number, number]),
+      material: (body as SpawnedBody & { material?: MaterialKind }).material ?? "wood",
     }));
     const ids = new Set(normalizedBodies.map((body) => body.id));
     const welds = value.welds.filter(
@@ -137,6 +146,7 @@ export function makeBody(
     ],
     rotation: [rand(-0.35, 0.35), rand(-Math.PI, Math.PI), rand(-0.35, 0.35)],
     scale: [1, 1, 1],
+    material: "wood",
     color: pick(PALETTES[kind]),
     // A small initial spin gives the pile life without making every piece
     // tumble like a rubber toy when it lands.
@@ -176,6 +186,7 @@ type PlaygroundState = {
   setDemolitionMode: (value: boolean) => void;
   setActiveTool: (tool: ConstructionTool) => void;
   setSelectedBodyId: (id: string | null) => void;
+  setSelectedMaterial: (material: MaterialKind) => void;
   setBodyPose: (
     id: string,
     position: [number, number, number],
@@ -281,6 +292,14 @@ export const usePlayground = create<PlaygroundState>((set) => ({
       selectedBodyId: null,
     }),
   setSelectedBodyId: (id) => set({ selectedBodyId: id }),
+  setSelectedMaterial: (material) =>
+    set((state) => ({
+      bodies: state.bodies.map((body) =>
+        body.id === state.selectedBodyId
+          ? { ...body, material, color: MATERIALS[material].color }
+          : body,
+      ),
+    })),
   setBodyPose: (id, position, rotation) =>
     set((state) => ({
       bodies: state.bodies.map((body) =>

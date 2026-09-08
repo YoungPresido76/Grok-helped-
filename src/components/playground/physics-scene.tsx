@@ -11,7 +11,7 @@ import {
 import { useEffect, useMemo, useRef } from "react";
 import { Color, Euler, MeshStandardMaterial, Plane, Quaternion, Vector2, Vector3 } from "three";
 import { orbitControlsRef } from "./orbit-controls";
-import { liveBodyPoses, usePlayground, type ShapeKind, type SpawnedBody } from "./store";
+import { liveBodyPoses, MATERIALS, usePlayground, type ShapeKind, type SpawnedBody } from "./store";
 
 const GRAB_Y_MIN = 0.55;
 const ARENA_RADIUS = 14;
@@ -66,11 +66,12 @@ function shapeMaterial(kind: ShapeKind, color: string) {
 
 function ShapeBody({ body }: { body: SpawnedBody }) {
   const restitution = usePlayground((s) => s.restitution);
+  const materialProfile = MATERIALS[body.material];
   const material = useMemo(
     () => shapeMaterial(body.kind, body.color),
     [body.kind, body.color],
   );
-  const friction = body.kind === "sphere" ? 0.58 : body.kind === "box" ? 0.82 : 0.68;
+  const friction = materialProfile.friction;
   const linearDamping = body.kind === "sphere" ? 0.3 : 0.24;
   const angularDamping = body.kind === "sphere" ? 0.62 : 0.48;
 
@@ -97,7 +98,7 @@ function ShapeBody({ body }: { body: SpawnedBody }) {
       rotation={body.rotation}
       scale={body.scale}
       colliders={false}
-      restitution={restitution}
+      restitution={Math.min(restitution + materialProfile.restitution, 0.35)}
       friction={friction}
       linearDamping={linearDamping}
       angularDamping={angularDamping}
@@ -105,9 +106,9 @@ function ShapeBody({ body }: { body: SpawnedBody }) {
       ccd
       canSleep
     >
-      {body.kind === "sphere" && <BallCollider args={[0.46]} />}
-      {body.kind === "box" && <CuboidCollider args={[0.42, 0.42, 0.42]} />}
-      {body.kind === "cylinder" && <CylinderCollider args={[0.5, 0.38]} />}
+      {body.kind === "sphere" && <BallCollider args={[0.46]} density={materialProfile.density} />}
+      {body.kind === "box" && <CuboidCollider args={[0.42, 0.42, 0.42]} density={materialProfile.density} />}
+      {body.kind === "cylinder" && <CylinderCollider args={[0.5, 0.38]} density={materialProfile.density} />}
       <mesh castShadow receiveShadow material={material}>
         {body.kind === "sphere" && <sphereGeometry args={[0.46, 32, 24]} />}
         {body.kind === "box" && <boxGeometry args={[0.84, 0.84, 0.84]} />}

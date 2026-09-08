@@ -6,8 +6,6 @@ import { usePlayground } from "./store";
 
 const PhysicsScene = lazy(() => import("./physics-scene"));
 
-const STAGE_TOP = 0.25;
-
 function Lights() {
   return (
     <>
@@ -35,21 +33,7 @@ function Lights() {
 
 function VisualArena() {
   return (
-    <>
-      <mesh position={[0, -1.2, 0]} receiveShadow>
-        <cylinderGeometry args={[16, 16, 0.4, 72]} />
-        <meshStandardMaterial color="#121316" roughness={0.96} metalness={0.04} />
-      </mesh>
-      <mesh receiveShadow castShadow>
-        <cylinderGeometry args={[6.5, 6.5, 0.5, 72]} />
-        <meshStandardMaterial color="#1a1c21" roughness={0.82} metalness={0.18} />
-      </mesh>
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, STAGE_TOP + 0.002, 0]}>
-        <ringGeometry args={[6.12, 6.5, 72]} />
-        <meshStandardMaterial color="#2c3038" roughness={0.35} metalness={0.62} />
-      </mesh>
-      <gridHelper args={[32, 64, "#3a3f48", "#262930"]} position={[0, -0.99, 0]} />
-    </>
+    <gridHelper args={[32, 64, "#3a3f48", "#262930"]} position={[0, 0, 0]} />
   );
 }
 
