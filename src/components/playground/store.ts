@@ -35,7 +35,7 @@ export type SavedStructure = {
 export type NamedPlayground = SavedStructure & { name: string };
 
 export type PresetKind = "wall" | "floor" | "pillar" | "room" | "bridge";
-export type ConstructionTool = "spawn" | "select" | "weld" | "demolish" | "scale";
+export type ConstructionTool = "none" | "spawn" | "select" | "weld" | "demolish" | "scale";
 
 export const STRUCTURE_STORAGE_KEY = "dropyard.structure.v1";
 export const PLAYGROUNDS_STORAGE_KEY = "dropyard.playgrounds.v1";
