@@ -1,6 +1,6 @@
 import { create } from "zustand";
 
-export type ShapeKind = "sphere" | "box" | "cylinder" | "cone" | "torus" | "capsule";
+export type ShapeKind = "sphere" | "box" | "cylinder" | "cone" | "torus" | "capsule" | "triangle" | "trapezium" | "plateau" | "arc" | "semicircle";
 export type MaterialKind = "wood" | "steel" | "glass";
 
 export type SpawnedBody = {
@@ -15,6 +15,7 @@ export type SpawnedBody = {
   locked: boolean;
   color: string;
   angularVelocity: [number, number, number];
+  groupId?: string;
 };
 
 export type Weld = {
@@ -63,6 +64,11 @@ const PALETTES: Record<ShapeKind, string[]> = {
   cone: ["#b26c45", "#c17a4f", "#9d5c3b", "#8d5037"],
   torus: ["#8b6cae", "#9a7cba", "#755990", "#674d82"],
   capsule: ["#5e8db0", "#6da0c3", "#4d7798", "#416885"],
+  triangle: ["#d08358", "#e09a6b", "#ba6a46", "#a95e3f"],
+  trapezium: ["#6f9c78", "#80af89", "#5e8666", "#507657"],
+  plateau: ["#a889bd", "#b99dca", "#9070a5", "#805f96"],
+  arc: ["#c29d5c", "#d1ae6d", "#ad8849", "#967438"],
+  semicircle: ["#6a9eb0", "#7db2c3", "#568798", "#477588"],
 };
 
 export const MATERIALS: Record<MaterialKind, { label: string; density: number; friction: number; restitution: number; color: string }> = {
@@ -111,7 +117,7 @@ function parseSavedStructure(raw: string | null): SavedStructure | null {
       (body): body is SpawnedBody =>
         Boolean(body) &&
         typeof body.id === "string" &&
-        ["sphere", "box", "cylinder", "cone", "torus", "capsule"].includes(body.kind) &&
+        ["sphere", "box", "cylinder", "cone", "torus", "capsule", "triangle", "trapezium", "plateau", "arc", "semicircle"].includes(body.kind) &&
         isTuple(body.position, 3) &&
         isTuple(body.rotation, 3) &&
         isTuple(body.angularVelocity, 3) &&
@@ -126,6 +132,7 @@ function parseSavedStructure(raw: string | null): SavedStructure | null {
         : ([1, 1, 1] as [number, number, number]),
       material: (body as SpawnedBody & { material?: MaterialKind }).material ?? "wood",
       locked: Boolean((body as SpawnedBody & { locked?: unknown }).locked),
+      groupId: typeof (body as SpawnedBody & { groupId?: unknown }).groupId === "string" ? (body as SpawnedBody).groupId : undefined,
     }));
     const ids = new Set(normalizedBodies.map((body) => body.id));
     const welds = value.welds.filter(
@@ -212,6 +219,8 @@ type PlaygroundState = {
   scatter: () => void;
   remove: (id: string) => void;
   duplicateSelected: () => void;
+  groupSelected: () => boolean;
+  ungroupSelected: () => boolean;
   newPlayground: () => void;
   renameBody: (id: string, name: string) => void;
   setSelectedTransform: (field: "position" | "rotation" | "scale", axis: 0 | 1 | 2, value: number) => void;
@@ -323,6 +332,30 @@ export const usePlayground = create<PlaygroundState>((set) => ({
       };
       return { ...withHistory(state, { bodies: [...state.bodies, copy].slice(-MAX_BODIES), selectedBodyId: copy.id }) };
     }),
+  groupSelected: () => {
+    const state = usePlayground.getState();
+    if (!state.selectedBodyId) return false;
+    const connected = new Set([state.selectedBodyId]);
+    let changed = true;
+    while (changed) {
+      changed = false;
+      for (const weld of state.welds) {
+        if (connected.has(weld.bodyA) && !connected.has(weld.bodyB)) { connected.add(weld.bodyB); changed = true; }
+        if (connected.has(weld.bodyB) && !connected.has(weld.bodyA)) { connected.add(weld.bodyA); changed = true; }
+      }
+    }
+    if (connected.size < 2) return false;
+    const groupId = `group-${Date.now()}`;
+    set((current) => withHistory(current, { bodies: current.bodies.map((body) => connected.has(body.id) ? { ...body, groupId } : body) }));
+    return true;
+  },
+  ungroupSelected: () => {
+    const state = usePlayground.getState();
+    const groupId = state.bodies.find((body) => body.id === state.selectedBodyId)?.groupId;
+    if (!groupId) return false;
+    set((current) => withHistory(current, { bodies: current.bodies.map((body) => body.groupId === groupId ? { ...body, groupId: undefined } : body) }));
+    return true;
+  },
   newPlayground: () => set((state) => withHistory(state, { bodies: [], welds: [], selectedBodyId: null, activeTool: "spawn", weldMode: false, demolitionMode: false })),
   renameBody: (id, name) => set((state) => ({ bodies: state.bodies.map((body) => body.id === id ? { ...body, name: name.trim() || body.name } : body) })),
   setSelectedTransform: (field, axis, value) => set((state) => withHistory(state, { bodies: state.bodies.map((body) => {
@@ -424,7 +457,7 @@ export const usePlayground = create<PlaygroundState>((set) => ({
     set((state) => ({
       bodies: state.bodies.map((body) => {
         if (body.id !== state.selectedBodyId) return body;
-        const position = [...body.position] as [number, number, number];
+        const position = [...(liveBodyPoses.get(body.id)?.position ?? body.position)] as [number, number, number];
         const index = axis === "x" ? 0 : axis === "y" ? 1 : 2;
         position[index] += distance;
         if (state.snapEnabled) position[index] = Math.round(position[index] / state.snapStep) * state.snapStep;

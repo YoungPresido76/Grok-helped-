@@ -17,8 +17,8 @@ export function CameraControls({ enabled }: { enabled: boolean }) {
     next.enablePan = true;
     next.minDistance = 5;
     next.maxDistance = 28;
-    next.minPolarAngle = 0.18;
-    next.maxPolarAngle = Math.PI / 2 - 0.08;
+    next.minPolarAngle = 0.05;
+    next.maxPolarAngle = Math.PI - 0.05;
     next.target.set(0, 0.55, 0);
     next.update();
     controls.current = next;

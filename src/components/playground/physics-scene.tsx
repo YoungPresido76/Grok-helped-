@@ -121,16 +121,22 @@ function ShapeBody({ body, selected }: { body: SpawnedBody; selected: boolean })
     >
       {body.kind === "sphere" && <BallCollider args={[0.46]} density={materialProfile.density} sensor={selected} />}
       {body.kind === "box" && <CuboidCollider args={[0.42, 0.42, 0.42]} density={materialProfile.density} sensor={selected} />}
-      {(body.kind === "cylinder" || body.kind === "cone") && <CylinderCollider args={[0.5, 0.38]} density={materialProfile.density} sensor={selected} />}
-      {(body.kind === "torus" || body.kind === "capsule") && <BallCollider args={[0.5]} density={materialProfile.density} sensor={selected} />}
+      {(body.kind === "cylinder" || body.kind === "cone" || body.kind === "triangle") && <CylinderCollider args={[0.5, 0.38]} density={materialProfile.density} sensor={selected} />}
+      {(body.kind === "torus" || body.kind === "capsule" || body.kind === "arc" || body.kind === "semicircle") && <BallCollider args={[0.5]} density={materialProfile.density} sensor={selected} />}
+      {(body.kind === "trapezium" || body.kind === "plateau") && <CuboidCollider args={[0.5, 0.35, 0.5]} density={materialProfile.density} sensor={selected} />}
       <group visible={body.visible}>
         <mesh castShadow receiveShadow material={material}>
           {body.kind === "sphere" && <sphereGeometry args={[0.46, 32, 24]} />}
           {body.kind === "box" && <boxGeometry args={[0.84, 0.84, 0.84]} />}
           {body.kind === "cylinder" && <cylinderGeometry args={[0.38, 0.38, 1, 28]} />}
           {body.kind === "cone" && <coneGeometry args={[0.48, 1, 28]} />}
+          {body.kind === "triangle" && <coneGeometry args={[0.58, 1, 3]} />}
+          {body.kind === "trapezium" && <cylinderGeometry args={[0.62, 0.42, 0.82, 4]} />}
+          {body.kind === "plateau" && <cylinderGeometry args={[0.62, 0.62, 0.42, 8]} />}
           {body.kind === "torus" && <torusGeometry args={[0.34, 0.14, 16, 32]} />}
           {body.kind === "capsule" && <capsuleGeometry args={[0.28, 0.5, 8, 16]} />}
+          {body.kind === "arc" && <torusGeometry args={[0.36, 0.14, 8, 20, Math.PI]} />}
+          {body.kind === "semicircle" && <sphereGeometry args={[0.5, 32, 12, 0, Math.PI * 2, 0, Math.PI / 2]} />}
         </mesh>
         {selected && <gridHelper args={[1.8, 8, "#f4cf72", "#6d5e2c"]} position={[0, -0.52, 0]} />}
       </group>
@@ -446,6 +452,7 @@ function GrabController() {
       if (weldMode || demolitionMode) {
         const pickedId = bodyIdFor(picked.body);
         if (!pickedId) return;
+        if (demolitionMode && usePlayground.getState().bodies.some((body) => (body.id === selectedBodyId || body.id === pickedId) && body.groupId)) return;
         if (!selectedBodyId || selectedBodyId === pickedId) {
           setSelectedBodyId(pickedId);
           return;
