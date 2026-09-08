@@ -359,7 +359,9 @@ export const usePlayground = create<PlaygroundState>((set) => ({
   newPlayground: () => set((state) => withHistory(state, { bodies: [], welds: [], selectedBodyId: null, activeTool: "spawn", weldMode: false, demolitionMode: false })),
   renameBody: (id, name) => set((state) => ({ bodies: state.bodies.map((body) => body.id === id ? { ...body, name: name.trim() || body.name } : body) })),
   setSelectedTransform: (field, axis, value) => set((state) => withHistory(state, { bodies: state.bodies.map((body) => {
-    if (body.id !== state.selectedBodyId || !Number.isFinite(value)) return body;
+    const selected = state.bodies.find((entry) => entry.id === state.selectedBodyId);
+    const sameGroup = field === "scale" && selected?.groupId && body.groupId === selected.groupId;
+    if ((body.id !== state.selectedBodyId && !sameGroup) || !Number.isFinite(value)) return body;
     const next = [...body[field]] as [number, number, number];
     next[axis] = field === "rotation" ? (value * Math.PI) / 180 : Math.max(field === "scale" ? 0.25 : -50, Math.min(field === "scale" ? 4 : 50, value));
     return { ...body, [field]: next };
@@ -440,7 +442,7 @@ export const usePlayground = create<PlaygroundState>((set) => ({
   transformSelected: (rotationDelta, scaleFactor) =>
     set((state) => ({
       bodies: state.bodies.map((body) =>
-        body.id === state.selectedBodyId
+        body.id === state.selectedBodyId || (state.bodies.find((entry) => entry.id === state.selectedBodyId)?.groupId && body.groupId === state.bodies.find((entry) => entry.id === state.selectedBodyId)?.groupId)
           ? {
               ...body,
               rotation: [body.rotation[0], body.rotation[1] + rotationDelta, body.rotation[2]],
