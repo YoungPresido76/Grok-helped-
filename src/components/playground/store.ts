@@ -162,13 +162,16 @@ type PlaygroundState = {
   paused: boolean;
   dragging: boolean;
   weldMode: boolean;
+  demolitionMode: boolean;
   selectedBodyId: string | null;
   spawn: (kind: ShapeKind, position?: [number, number, number]) => void;
   scatter: () => void;
   remove: (id: string) => void;
   clear: () => void;
   weld: (bodyA: string, bodyB: string) => void;
+  unweld: (bodyA: string, bodyB: string) => void;
   setWeldMode: (value: boolean) => void;
+  setDemolitionMode: (value: boolean) => void;
   setSelectedBodyId: (id: string | null) => void;
   setBodyPose: (
     id: string,
@@ -195,6 +198,7 @@ export const usePlayground = create<PlaygroundState>((set) => ({
   paused: false,
   dragging: false,
   weldMode: false,
+  demolitionMode: false,
   selectedBodyId: null,
   spawn: (kind, position) =>
     set((state) => {
@@ -248,7 +252,20 @@ export const usePlayground = create<PlaygroundState>((set) => ({
         selectedBodyId: null,
       };
     }),
-  setWeldMode: (value) => set({ weldMode: value, selectedBodyId: null }),
+  unweld: (bodyA, bodyB) =>
+    set((state) => ({
+      welds: state.welds.filter(
+        (weld) =>
+          !(
+            (weld.bodyA === bodyA && weld.bodyB === bodyB) ||
+            (weld.bodyA === bodyB && weld.bodyB === bodyA)
+          ),
+      ),
+      selectedBodyId: null,
+    })),
+  setWeldMode: (value) => set({ weldMode: value, demolitionMode: false, selectedBodyId: null }),
+  setDemolitionMode: (value) =>
+    set({ demolitionMode: value, weldMode: false, selectedBodyId: null }),
   setSelectedBodyId: (id) => set({ selectedBodyId: id }),
   setBodyPose: (id, position, rotation) =>
     set((state) => ({

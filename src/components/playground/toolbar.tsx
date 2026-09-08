@@ -5,6 +5,7 @@ import {
   FolderOpen,
   Link2,
   Maximize2,
+  Unlink2,
   Pause,
   Play,
   RotateCw,
@@ -36,8 +37,10 @@ export function Toolbar() {
   const togglePaused = usePlayground((s) => s.togglePaused);
   const count = usePlayground((s) => s.bodies.length);
   const weldMode = usePlayground((s) => s.weldMode);
+  const demolitionMode = usePlayground((s) => s.demolitionMode);
   const selectedBodyId = usePlayground((s) => s.selectedBodyId);
   const setWeldMode = usePlayground((s) => s.setWeldMode);
+  const setDemolitionMode = usePlayground((s) => s.setDemolitionMode);
   const saveStructure = usePlayground((s) => s.saveStructure);
   const loadStructure = usePlayground((s) => s.loadStructure);
   const transformSelected = usePlayground((s) => s.transformSelected);
@@ -119,6 +122,16 @@ export function Toolbar() {
               <span>{weldMode ? "Welding…" : "Weld"}</span>
             </Button>
             <Button
+              variant={demolitionMode ? "solid" : "muted"}
+              onClick={() => setDemolitionMode(!demolitionMode)}
+              aria-pressed={demolitionMode}
+              aria-label={demolitionMode ? "Exit demolition mode" : "Enter demolition mode"}
+              title="Select two connected bodies to break their weld"
+            >
+              <Unlink2 className="size-4" strokeWidth={1.75} />
+              <span>{demolitionMode ? "Demolishing…" : "Demolish"}</span>
+            </Button>
+            <Button
               variant="ghost"
               onClick={clear}
               className="sm:ml-auto"
@@ -157,11 +170,15 @@ export function Toolbar() {
               onValueChange={setRestitution}
             />
           </div>
-          {weldMode && (
+          {(weldMode || demolitionMode) && (
             <p className="text-xs text-muted" role="status">
-              {selectedBodyId
-                ? "Now click a nearby body to snap and weld it."
-                : "Click one body, then another nearby body to weld them together."}
+              {demolitionMode
+                ? selectedBodyId
+                  ? "Now click the connected body to break their weld."
+                  : "Click one body, then the connected body whose weld you want to break."
+                : selectedBodyId
+                  ? "Now click a nearby body to snap and weld it."
+                  : "Click one body, then another nearby body to weld them together."}
             </p>
           )}
           {status && <p className="text-xs text-muted" role="status">{status}</p>}
