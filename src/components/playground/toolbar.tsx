@@ -7,6 +7,8 @@ import {
   BookOpen,
   Circle,
   CircleHelp,
+  CircleDot,
+  Copy,
   Cuboid,
   Cylinder,
   FolderOpen,
@@ -15,12 +17,14 @@ import {
   Lock,
   Maximize2,
   Menu,
+  MoreHorizontal,
   Pause,
   Play,
   RotateCcw,
   RotateCw,
   Save,
   Shuffle,
+  Triangle,
   Trash2,
   Unlock,
   Unlink2,
@@ -32,7 +36,6 @@ import { Slider } from "@/components/ui/slider";
 import { ThemeSelect } from "@/components/theme-select";
 import { cn } from "@/lib/utils";
 import {
-  MATERIALS,
   usePlayground,
   type ConstructionTool,
   type MaterialKind,
@@ -52,6 +55,9 @@ const SHAPES: { kind: ShapeKind; label: string; icon: typeof Circle }[] = [
   { kind: "sphere", label: "Sphere", icon: Circle },
   { kind: "box", label: "Box", icon: Cuboid },
   { kind: "cylinder", label: "Cylinder", icon: Cylinder },
+  { kind: "cone", label: "Cone", icon: Triangle },
+  { kind: "torus", label: "Torus", icon: CircleDot },
+  { kind: "capsule", label: "Capsule", icon: Cylinder },
 ];
 
 export function Toolbar() {
@@ -71,6 +77,13 @@ export function Toolbar() {
   const activeTool = usePlayground((s) => s.activeTool);
   const setActiveTool = usePlayground((s) => s.setActiveTool);
   const saveStructure = usePlayground((s) => s.saveStructure);
+  const saveNamed = usePlayground((s) => s.saveNamed);
+  const loadNamed = usePlayground((s) => s.loadNamed);
+  const deleteNamed = usePlayground((s) => s.deleteNamed);
+  const hydrateSavedPlaygrounds = usePlayground((s) => s.hydrateSavedPlaygrounds);
+  const savedPlaygrounds = usePlayground((s) => s.savedPlaygrounds);
+  const remove = usePlayground((s) => s.remove);
+  const duplicateSelected = usePlayground((s) => s.duplicateSelected);
   const loadStructure = usePlayground((s) => s.loadStructure);
   const transformSelected = usePlayground((s) => s.transformSelected);
   const setSelectedMaterial = usePlayground((s) => s.setSelectedMaterial);
@@ -79,16 +92,20 @@ export function Toolbar() {
   const spawnCount = usePlayground((s) => s.spawnCount);
   const setSpawnCount = usePlayground((s) => s.setSpawnCount);
   const selectedLocked = usePlayground((s) => s.bodies.find((body) => body.id === s.selectedBodyId)?.locked ?? false);
+  const selectedMaterial = usePlayground((s) => s.bodies.find((body) => body.id === s.selectedBodyId)?.material ?? "wood");
   const moveSelected = usePlayground((s) => s.moveSelected);
   const rotateSelected = usePlayground((s) => s.rotateSelected);
   const spawnPreset = usePlayground((s) => s.spawnPreset);
   const [open, setOpen] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
+  const [saveName, setSaveName] = useState("");
+  const [objectMenuOpen, setObjectMenuOpen] = useState(false);
   const selected = selectedBodyId !== null;
 
   useEffect(() => {
     if (loadStructure()) setStatus("Loaded saved structure");
-  }, [loadStructure]);
+    hydrateSavedPlaygrounds();
+  }, [hydrateSavedPlaygrounds, loadStructure]);
 
   useEffect(() => {
     const close = () => setOpen(false);
@@ -102,13 +119,22 @@ export function Toolbar() {
   };
   const handleSave = () => setStatus(saveStructure() ? "Structure saved on this device" : "Could not save structure");
   const handleLoad = () => setStatus(loadStructure() ? "Structure loaded" : "No saved structure found");
+  const handleNamedSave = () => {
+    if (saveNamed(saveName)) {
+      setStatus(`Saved playground “${saveName.trim()}”`);
+      setSaveName("");
+    } else setStatus("Enter a name before saving");
+  };
 
   return (
     <div className="pointer-events-none absolute inset-0 p-3 pt-[max(0.75rem,env(safe-area-inset-top))] pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:p-5">
       <header className="pointer-events-none flex items-start justify-between gap-3">
-        <div>
+        <div className="pointer-events-auto flex items-start gap-3">
+          <Button variant={open ? "solid" : "muted"} size="icon" onClick={() => setOpen((value) => !value)} aria-expanded={open} aria-label={open ? "Close plan menu" : "Open plan menu"}><Menu className="size-5" /></Button>
+          <div>
           <h1 className="font-sans text-xl font-semibold tracking-tight text-fg sm:text-2xl">Dropyard</h1>
           <p className="mt-0.5 text-xs text-muted sm:text-sm">Physics playground</p>
+          </div>
         </div>
         <div className="pointer-events-auto flex items-center gap-2">
           <p className="rounded-sm border border-border bg-surface/90 px-3 py-2 text-xs font-medium tabular-nums text-muted backdrop-blur-sm"><span className="text-fg">{count}</span> bodies</p>
@@ -118,10 +144,20 @@ export function Toolbar() {
       </header>
 
       {open && (
-        <div className="pointer-events-auto absolute inset-x-3 bottom-[calc(4.75rem+env(safe-area-inset-bottom))] mx-auto max-h-[min(70dvh,34rem)] w-[calc(100%-1.5rem)] max-w-3xl overflow-y-auto rounded-toolbar border border-border/80 bg-surface/85 p-3 shadow-toolbar backdrop-blur-xl sm:inset-x-5 sm:bottom-[calc(5.25rem+env(safe-area-inset-bottom))] sm:w-[calc(100%-2.5rem)] sm:p-4">
+        <div className="pointer-events-auto absolute left-3 top-[calc(4.25rem+env(safe-area-inset-top))] z-30 max-h-[min(78dvh,42rem)] w-[min(94vw,28rem)] overflow-y-auto rounded-toolbar border border-border/80 bg-surface/90 p-3 shadow-toolbar backdrop-blur-xl sm:left-5 sm:top-[calc(4.75rem+env(safe-area-inset-top))] sm:p-4">
           <div className="mb-3 flex items-center justify-between border-b border-border pb-3">
-            <div><p className="text-sm font-semibold">Construction tools</p><p className="text-xs text-muted">Select a piece, then use its labeled X / Y / Z controls.</p></div>
+            <div><p className="text-sm font-semibold">Plan mode</p><p className="text-xs text-muted">Build, save, and manage your playground.</p></div>
             <Button variant="ghost" size="icon" onClick={() => setOpen(false)} aria-label="Close tools menu"><X className="size-4" /></Button>
+          </div>
+
+          <div className="mb-3 grid grid-cols-2 gap-2 border-b border-border pb-3">
+            <Link to="/tutorial" className="inline-flex min-h-10 items-center justify-center gap-2 rounded-sm bg-surface-2 px-3 text-xs font-semibold text-fg hover:bg-border"><BookOpen className="size-4" /> Guide</Link>
+            <Link to="/faq" className="inline-flex min-h-10 items-center justify-center gap-2 rounded-sm bg-surface-2 px-3 text-xs font-semibold text-fg hover:bg-border"><CircleHelp className="size-4" /> FAQs</Link>
+          </div>
+
+          <div className="mb-3 border-b border-border pb-3">
+            <p className="mb-2 text-xs font-semibold uppercase tracking-[0.14em] text-subtle">Saved playgrounds</p>
+            {savedPlaygrounds.length === 0 ? <p className="text-xs text-muted">No named playgrounds yet.</p> : <div className="space-y-1">{savedPlaygrounds.slice().reverse().map((entry) => <div key={entry.name} className="flex items-center gap-2 rounded-sm bg-surface-2 px-2 py-1.5"><button type="button" className="min-w-0 flex-1 truncate text-left text-xs font-semibold text-fg hover:text-accent" onClick={() => setStatus(loadNamed(entry.name) ? `Loaded “${entry.name}”` : "Could not load playground")}>{entry.name}</button><button type="button" className="rounded-sm p-1 text-muted hover:bg-border hover:text-danger" onClick={() => deleteNamed(entry.name)} aria-label={`Delete saved playground ${entry.name}`}><Trash2 className="size-3.5" /></button></div>)}</div>}
           </div>
 
           <div className="grid grid-cols-2 gap-1 rounded-sm border border-border bg-surface-2 p-1 sm:grid-cols-5">
@@ -155,11 +191,12 @@ export function Toolbar() {
 
           {activeTool === "scale" && <p className="mt-3 text-xs leading-5 text-muted">Click a piece to select it, then switch to Select for axis movement, ring gestures, and the Upright action.</p>}
 
-          {activeTool === "select" && <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-border pt-3"><span className="text-xs font-semibold text-muted">Material</span>{(Object.keys(MATERIALS) as MaterialKind[]).map((material) => <Button key={material} variant="muted" disabled={!selected} onClick={() => setSelectedMaterial(material)}>{MATERIALS[material].label}</Button>)}</div>}
+          {activeTool === "select" && <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-border pt-3"><span className="text-xs font-semibold text-muted">Material</span><select disabled={!selected} value={selectedMaterial} onChange={(event) => setSelectedMaterial(event.target.value as MaterialKind)} className="h-10 rounded-sm border border-border bg-surface-2 px-3 text-xs font-semibold text-fg"><option value="wood">Wood</option><option value="steel">Steel</option><option value="glass">Glass</option></select></div>}
+          {activeTool === "select" && <div className="relative mt-3 flex items-center gap-2 border-t border-border pt-3"><span className="text-xs font-semibold text-muted">Selected object</span><Button variant="muted" size="icon" disabled={!selected} onClick={() => setObjectMenuOpen((value) => !value)} aria-label="Open selected object menu"><MoreHorizontal className="size-4" /></Button>{objectMenuOpen && selected && <div className="absolute left-28 top-10 z-10 flex min-w-44 flex-col gap-1 rounded-sm border border-border bg-surface p-1.5 shadow-toolbar"><button type="button" className="flex items-center gap-2 rounded-sm px-3 py-2 text-left text-xs font-semibold text-fg hover:bg-surface-2" onClick={() => { duplicateSelected(); setObjectMenuOpen(false); setStatus("Copied exact object and spawned it nearby"); }}><Copy className="size-4" /> Copy and spawn exact object</button><button type="button" className="flex items-center gap-2 rounded-sm px-3 py-2 text-left text-xs font-semibold text-danger hover:bg-surface-2" onClick={() => { if (selectedBodyId) remove(selectedBodyId); setObjectMenuOpen(false); setStatus("Object deleted"); }}><Trash2 className="size-4" /> Delete object</button></div>}</div>}
           {activeTool === "select" && <div className="mt-3 flex flex-wrap items-center gap-2"><Button variant={selectedLocked ? "solid" : "muted"} disabled={!selected} onClick={toggleSelectedLock}>{selectedLocked ? <Unlock className="size-4" /> : <Lock className="size-4" />}{selectedLocked ? "Release lock" : "Lock in place"}</Button>{selected && <span className="text-xs text-muted">{selectedLocked ? "Locked mid-air or on the ground." : "Selection is stable while you edit; lock it to keep it fixed after deselection."}</span>}</div>}
 
           <div className="mt-3 grid grid-cols-1 gap-2 border-t border-border pt-3 sm:grid-cols-2 sm:gap-5"><Slider label="Gravity" value={gravity} min={0} max={20} step={0.1} display={gravity.toFixed(1)} onValueChange={setGravity} /><Slider label="Bounce" value={restitution} min={0} max={1} step={0.01} display={restitution.toFixed(2)} onValueChange={setRestitution} /></div>
-          <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-border pt-3"><Button variant="muted" onClick={handleSave}><Save className="size-4" />Save</Button><Button variant="muted" onClick={handleLoad}><FolderOpen className="size-4" />Load</Button><Button variant="ghost" onClick={clear}><Trash2 className="size-4" />Clear</Button><Link to="/tutorial" className="ml-auto inline-flex items-center gap-1.5 px-2 py-2 text-xs font-semibold text-muted hover:text-fg"><BookOpen className="size-4" />Guide</Link><Link to="/faq" className="inline-flex items-center gap-1.5 px-2 py-2 text-xs font-semibold text-muted hover:text-fg"><CircleHelp className="size-4" />FAQ</Link></div>
+          <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-border pt-3"><input value={saveName} onChange={(event) => setSaveName(event.target.value)} placeholder="Name playground" className="h-10 min-w-40 flex-1 rounded-sm border border-border bg-surface-2 px-3 text-xs text-fg outline-none placeholder:text-subtle" onKeyDown={(event) => { if (event.key === "Enter") handleNamedSave(); }} /><Button variant="solid" onClick={handleNamedSave}><Save className="size-4" />Save named</Button><Button variant="muted" onClick={handleSave} title="Quick save"><Save className="size-4" /></Button><Button variant="muted" onClick={handleLoad}><FolderOpen className="size-4" />Load quick</Button><Button variant="ghost" onClick={clear}><Trash2 className="size-4" />Clear</Button></div>
           {status && <p className="mt-2 text-xs text-muted" role="status">{status}</p>}
         </div>
       )}
@@ -171,7 +208,6 @@ export function Toolbar() {
           const Icon = entry.icon;
           return <button key={tool} type="button" onClick={() => selectTool(tool)} className={cn("flex min-h-11 flex-1 items-center justify-center gap-2 rounded-sm px-2 text-xs font-semibold", activeTool === tool ? "bg-accent text-accent-fg" : "text-muted hover:bg-border hover:text-fg")} title={entry.hint}><Icon className="size-4" /><span className="hidden sm:inline">{tool === "demolish" ? "Break" : entry.label}</span></button>;
         })}
-        <button type="button" onClick={() => setOpen(!open)} aria-expanded={open} aria-label={open ? "Close tools menu" : "Open tools menu"} className={cn("flex min-h-11 min-w-11 items-center justify-center rounded-sm", open ? "bg-surface-2 text-fg" : "text-muted hover:bg-border hover:text-fg")}><Menu className="size-5" /></button>
       </nav>
     </div>
   );

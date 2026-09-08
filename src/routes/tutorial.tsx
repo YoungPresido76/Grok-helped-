@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import { ArrowLeft, Box, CircleHelp, Hammer, Link2, RotateCcw, Save, Unlink2 } from "lucide-react";
+import { ArrowLeft, Box, CircleHelp, Hammer, Link2, Menu, RotateCcw, Save, Unlink2 } from "lucide-react";
 import { createFileRoute } from "@tanstack/react-router";
 import { ThemeSelect } from "@/components/theme-select";
 
@@ -40,6 +40,11 @@ const steps = [
     icon: Save,
     title: "Use shortcuts and themes",
     body: "For a Blender-like flow, press G or R for Select, S for Scale, U for Upright, and X/Y/Z to rotate the selected piece around an axis. Use the theme selector to choose System, Light, or Dark; your preference is saved on this device.",
+  },
+  {
+    icon: Menu,
+    title: "Plan, save, and reuse",
+    body: "Open the hamburger menu in the top-left. Name and save the full playground, load any saved version from the list, or spawn a Sphere, Box, Cylinder, Cone, Torus, or Capsule from the object library. Select an object to change its material, lock it as an anchor, copy it exactly, or delete it from the scene.",
   },
 ];
 

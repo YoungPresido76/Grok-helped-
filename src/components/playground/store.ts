@@ -1,6 +1,6 @@
 import { create } from "zustand";
 
-export type ShapeKind = "sphere" | "box" | "cylinder";
+export type ShapeKind = "sphere" | "box" | "cylinder" | "cone" | "torus" | "capsule";
 export type MaterialKind = "wood" | "steel" | "glass";
 
 export type SpawnedBody = {
@@ -22,7 +22,7 @@ export type Weld = {
 };
 
 export type SavedStructure = {
-  version: 1;
+  version: 1 | 2;
   savedAt: string;
   bodies: SpawnedBody[];
   welds: Weld[];
@@ -30,10 +30,13 @@ export type SavedStructure = {
   restitution: number;
 };
 
+export type NamedPlayground = SavedStructure & { name: string };
+
 export type PresetKind = "wall" | "floor" | "pillar" | "room" | "bridge";
 export type ConstructionTool = "spawn" | "select" | "weld" | "demolish" | "scale";
 
 export const STRUCTURE_STORAGE_KEY = "dropyard.structure.v1";
+export const PLAYGROUNDS_STORAGE_KEY = "dropyard.playgrounds.v1";
 export const liveBodyPoses = new Map<
   string,
   { position: [number, number, number]; rotation: [number, number, number] }
@@ -45,6 +48,9 @@ const PALETTES: Record<ShapeKind, string[]> = {
   sphere: ["#c56a4a", "#d07a58", "#b85c40", "#a8523a"],
   box: ["#3d6b6a", "#4a7c74", "#355e62", "#2f5850"],
   cylinder: ["#bba57e", "#c9b48a", "#a8946c", "#9a8662"],
+  cone: ["#b26c45", "#c17a4f", "#9d5c3b", "#8d5037"],
+  torus: ["#8b6cae", "#9a7cba", "#755990", "#674d82"],
+  capsule: ["#5e8db0", "#6da0c3", "#4d7798", "#416885"],
 };
 
 export const MATERIALS: Record<MaterialKind, { label: string; density: number; friction: number; restitution: number; color: string }> = {
@@ -81,7 +87,7 @@ function parseSavedStructure(raw: string | null): SavedStructure | null {
   try {
     const value = JSON.parse(raw) as Partial<SavedStructure>;
     if (
-      value.version !== 1 ||
+      (value.version !== 1 && value.version !== 2) ||
       !Array.isArray(value.bodies) ||
       !Array.isArray(value.welds) ||
       typeof value.gravity !== "number" ||
@@ -93,7 +99,7 @@ function parseSavedStructure(raw: string | null): SavedStructure | null {
       (body): body is SpawnedBody =>
         Boolean(body) &&
         typeof body.id === "string" &&
-        ["sphere", "box", "cylinder"].includes(body.kind) &&
+        ["sphere", "box", "cylinder", "cone", "torus", "capsule"].includes(body.kind) &&
         isTuple(body.position, 3) &&
         isTuple(body.rotation, 3) &&
         isTuple(body.angularVelocity, 3) &&
@@ -119,7 +125,7 @@ function parseSavedStructure(raw: string | null): SavedStructure | null {
         ids.has(weld.bodyB),
     );
     return {
-      version: 1,
+      version: value.version,
       savedAt: typeof value.savedAt === "string" ? value.savedAt : new Date().toISOString(),
       bodies: normalizedBodies,
       welds,
@@ -135,7 +141,7 @@ export function makeBody(
   kind: ShapeKind,
   position?: [number, number, number],
 ): SpawnedBody {
-  const spread = kind === "cylinder" ? 1.6 : 1.15;
+  const spread = kind === "cylinder" || kind === "cone" || kind === "capsule" ? 1.6 : 1.15;
   const angle = Math.random() * Math.PI * 2;
   const radius = Math.random() * spread;
   return {
@@ -180,9 +186,11 @@ type PlaygroundState = {
   activeTool: ConstructionTool;
   selectedBodyId: string | null;
   spawnCount: number;
+  savedPlaygrounds: NamedPlayground[];
   spawn: (kind: ShapeKind, position?: [number, number, number]) => void;
   scatter: () => void;
   remove: (id: string) => void;
+  duplicateSelected: () => void;
   clear: () => void;
   weld: (bodyA: string, bodyB: string) => void;
   unweld: (bodyA: string, bodyB: string) => void;
@@ -205,6 +213,10 @@ type PlaygroundState = {
   uprightSelected: () => void;
   spawnPreset: (preset: PresetKind) => void;
   saveStructure: () => boolean;
+  saveNamed: (name: string) => boolean;
+  loadNamed: (name: string) => boolean;
+  deleteNamed: (name: string) => void;
+  hydrateSavedPlaygrounds: () => void;
   loadStructure: () => boolean;
   setGravity: (value: number) => void;
   setRestitution: (value: number) => void;
@@ -226,6 +238,7 @@ export const usePlayground = create<PlaygroundState>((set) => ({
   activeTool: "spawn",
   selectedBodyId: null,
   spawnCount: 1,
+  savedPlaygrounds: [],
   spawn: (kind, position) =>
     set((state) => {
       const next = [...state.bodies, makeBody(kind, position)];
@@ -238,7 +251,7 @@ export const usePlayground = create<PlaygroundState>((set) => ({
     }),
   scatter: () =>
     set((state) => {
-      const kinds: ShapeKind[] = ["sphere", "box", "cylinder"];
+      const kinds: ShapeKind[] = ["sphere", "box", "cylinder", "cone", "torus", "capsule"];
       const extra: SpawnedBody[] = Array.from({ length: 9 }, (_, i) => {
         const kind = kinds[i % 3] as ShapeKind;
         const angle = (i / 9) * Math.PI * 2 + rand(-0.2, 0.2);
@@ -263,6 +276,19 @@ export const usePlayground = create<PlaygroundState>((set) => ({
       welds: state.welds.filter((weld) => weld.bodyA !== id && weld.bodyB !== id),
       selectedBodyId: state.selectedBodyId === id ? null : state.selectedBodyId,
     })),
+  duplicateSelected: () =>
+    set((state) => {
+      const source = state.bodies.find((body) => body.id === state.selectedBodyId);
+      if (!source) return state;
+      const copy = {
+        ...source,
+        id: nextId(),
+        position: [source.position[0] + 1.1, source.position[1] + 0.4, source.position[2]] as [number, number, number],
+        locked: false,
+        angularVelocity: [0, 0, 0] as [number, number, number],
+      };
+      return { bodies: [...state.bodies, copy].slice(-MAX_BODIES), selectedBodyId: copy.id };
+    }),
   clear: () => set({ bodies: [], welds: [], selectedBodyId: null }),
   weld: (bodyA, bodyB) =>
     set((state) => {
@@ -422,6 +448,60 @@ export const usePlayground = create<PlaygroundState>((set) => ({
         welds: state.welds.filter((weld) => liveIds.has(weld.bodyA) && liveIds.has(weld.bodyB)),
       };
     }),
+  saveNamed: (name) => {
+    if (typeof window === "undefined" || !name.trim()) return false;
+    const state = usePlayground.getState();
+    const snapshot: NamedPlayground = {
+      name: name.trim(),
+      version: 2,
+      savedAt: new Date().toISOString(),
+      bodies: state.bodies.map((body) => ({ ...body, ...(liveBodyPoses.get(body.id) ?? {}) })),
+      welds: state.welds,
+      gravity: state.gravity,
+      restitution: state.restitution,
+    };
+    try {
+      const existing = JSON.parse(window.localStorage.getItem(PLAYGROUNDS_STORAGE_KEY) ?? "[]") as NamedPlayground[];
+      const next = [...existing.filter((entry) => entry.name !== snapshot.name), snapshot].slice(-20);
+      window.localStorage.setItem(PLAYGROUNDS_STORAGE_KEY, JSON.stringify(next));
+      set({ savedPlaygrounds: next });
+      return true;
+    } catch {
+      return false;
+    }
+  },
+  loadNamed: (name) => {
+    if (typeof window === "undefined") return false;
+    try {
+      const entries = JSON.parse(window.localStorage.getItem(PLAYGROUNDS_STORAGE_KEY) ?? "[]") as NamedPlayground[];
+      const saved = parseSavedStructure(JSON.stringify(entries.find((entry) => entry.name === name)));
+      if (!saved) return false;
+      set({ bodies: saved.bodies, welds: saved.welds, gravity: saved.gravity, restitution: saved.restitution, selectedBodyId: null, activeTool: "spawn", weldMode: false, demolitionMode: false });
+      liveBodyPoses.clear();
+      return true;
+    } catch {
+      return false;
+    }
+  },
+  deleteNamed: (name) => {
+    if (typeof window === "undefined") return;
+    try {
+      const next = (JSON.parse(window.localStorage.getItem(PLAYGROUNDS_STORAGE_KEY) ?? "[]") as NamedPlayground[]).filter((entry) => entry.name !== name);
+      window.localStorage.setItem(PLAYGROUNDS_STORAGE_KEY, JSON.stringify(next));
+      set({ savedPlaygrounds: next });
+    } catch {
+      /* ignore malformed local storage */
+    }
+  },
+  hydrateSavedPlaygrounds: () => {
+    if (typeof window === "undefined") return;
+    try {
+      const saved = JSON.parse(window.localStorage.getItem(PLAYGROUNDS_STORAGE_KEY) ?? "[]") as NamedPlayground[];
+      set({ savedPlaygrounds: saved.filter((entry) => typeof entry.name === "string") });
+    } catch {
+      set({ savedPlaygrounds: [] });
+    }
+  },
   saveStructure: () => {
     if (typeof window === "undefined") return false;
     const state = usePlayground.getState();

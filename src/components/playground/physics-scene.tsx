@@ -117,11 +117,15 @@ function ShapeBody({ body, selected }: { body: SpawnedBody; selected: boolean })
     >
       {body.kind === "sphere" && <BallCollider args={[0.46]} density={materialProfile.density} />}
       {body.kind === "box" && <CuboidCollider args={[0.42, 0.42, 0.42]} density={materialProfile.density} />}
-      {body.kind === "cylinder" && <CylinderCollider args={[0.5, 0.38]} density={materialProfile.density} />}
+      {(body.kind === "cylinder" || body.kind === "cone") && <CylinderCollider args={[0.5, 0.38]} density={materialProfile.density} />}
+      {(body.kind === "torus" || body.kind === "capsule") && <BallCollider args={[0.5]} density={materialProfile.density} />}
       <mesh castShadow receiveShadow material={material}>
         {body.kind === "sphere" && <sphereGeometry args={[0.46, 32, 24]} />}
         {body.kind === "box" && <boxGeometry args={[0.84, 0.84, 0.84]} />}
         {body.kind === "cylinder" && <cylinderGeometry args={[0.38, 0.38, 1, 28]} />}
+        {body.kind === "cone" && <coneGeometry args={[0.48, 1, 28]} />}
+        {body.kind === "torus" && <torusGeometry args={[0.34, 0.14, 16, 32]} />}
+        {body.kind === "capsule" && <capsuleGeometry args={[0.28, 0.5, 8, 16]} />}
       </mesh>
       {selected && <gridHelper args={[1.8, 8, "#f4cf72", "#6d5e2c"]} position={[0, -0.52, 0]} />}
     </RigidBody>
