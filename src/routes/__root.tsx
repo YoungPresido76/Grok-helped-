@@ -1,5 +1,6 @@
 import { createRootRoute, HeadContent, Outlet, Scripts } from "@tanstack/react-router";
 import { AuthProvider } from "@/lib/auth/provider";
+import { OfflineRegister } from "@/components/offline-register";
 import { PreviewHostBridge } from "@/components/preview-host-bridge";
 import { ThemeProvider } from "@/contexts/theme";
 import appCss from "../styles.css?url";
@@ -17,15 +18,15 @@ export const Route = createRootRoute({
         content: "Drop spheres, boxes, and cylinders. Stack, bounce, and topple them in a 3D physics playground.",
       },
       { name: "theme-color", content: "#0c0d0f" },
+      { name: "mobile-web-app-capable", content: "yes" },
+      { name: "apple-mobile-web-app-capable", content: "yes" },
+      { name: "apple-mobile-web-app-title", content: APP_NAME },
+      { name: "apple-mobile-web-app-status-bar-style", content: "black-translucent" },
     ],
     links: [
       { rel: "icon", type: "image/svg+xml", href: "/favicon.svg" },
-      {
-        rel: "stylesheet",
-        href: "https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&display=swap",
-      },
       { rel: "stylesheet", href: appCss },
-      { rel: "manifest", href: "/__grok/manifest.webmanifest" },
+      { rel: "manifest", href: "/manifest.webmanifest" },
       { rel: "apple-touch-icon", href: "/__grok/icon-180.png" },
     ],
   }),
@@ -35,6 +36,7 @@ export const Route = createRootRoute({
         <HeadContent />
       </head>
       <body>
+        <OfflineRegister />
         <PreviewHostBridge />
         <ThemeProvider>
           <AuthProvider>

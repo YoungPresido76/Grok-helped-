@@ -1,0 +1,28 @@
+{
+  "name": "Dropyard — Physics Playground",
+  "short_name": "Dropyard",
+  "description": "An offline 3D physics playground for building, stacking, and editing objects.",
+  "id": "/",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0c0d0f",
+  "theme_color": "#0c0d0f",
+  "lang": "en",
+  "categories": ["games", "design", "utilities"],
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
