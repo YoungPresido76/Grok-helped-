@@ -6,7 +6,11 @@ export const Route = createFileRoute("/faq")({ component: FaqPage });
 
 const questions = [
   ["What is Dropyard?", "Dropyard is a small 3D physics construction sandbox. Add pieces, let gravity act on them, join them with welds, and experiment with structures that behave like physical objects."],
-  ["How do I select a piece?", "Click a body in the scene. The selected body becomes the target for Scale mode controls. In Weld and Demolish modes, click a first body and then a second body to complete the operation."],
+  ["How do I select and edit a piece?", "Choose Select from the floating HUD, then click a body. The selected piece stays stable while you edit it instead of falling away under gravity. Use the labeled X, Y, and Z move buttons or drag the matching red, green, and blue rotation rings around the piece."],
+  ["What do the X, Y, and Z gizmo labels mean?", "X is the red axis, Y is the green axis, and Z is the blue axis. The labels are attached to the selected piece, so they rotate with it and show which local axis each ring controls."],
+  ["How do I rotate something with a gesture?", "With a piece selected, drag one of the colored axis rings. Horizontal or vertical pointer movement turns the piece continuously, giving you a full 360-degree rotation gesture. Orbit the camera by dragging outside the gizmo."],
+  ["How do I make a rectangle upright again?", "Open Select and press Upright. This resets the selected piece's X and Z tilt while keeping its Y heading, so a rectangle lying on its side returns to a normal upright construction orientation."],
+  ["Why did an object used to fall when I moved or rotated it?", "Earlier editing handed the body back to dynamic physics as soon as the pointer was released. The current editor keeps the selected body kinematic during editing; use Lock in place when you want it to remain fixed even after you select another piece."],
   ["Why did my weld not work?", "Welding requires the two pieces to be close enough—roughly 2.4 world units. Move them nearer, switch to Weld, and try again. Weld mode also snaps the second piece into a stable position."],
   ["What does Demolish remove?", "Demolish removes only the fixed joint between the two selected bodies. It does not delete either body or any other welds, so the rest of your structure remains intact."],
   ["Where are my saved structures?", "Save data is kept in this browser's local storage on this device. It is not an online account backup. Use Save before major experiments and Load to restore the latest saved version."],
@@ -17,8 +21,8 @@ const questions = [
 
 function FaqPage() {
   return (
-    <main className="min-h-dvh bg-bg px-4 py-6 text-fg sm:px-8 sm:py-10">
-      <div className="mx-auto max-w-4xl">
+    <main className="h-dvh overflow-y-auto overscroll-contain bg-bg px-4 py-6 text-fg sm:px-8 sm:py-10">
+      <div className="mx-auto max-w-4xl pb-10">
         <nav className="mb-12 flex items-center justify-between">
           <Link to="/" className="inline-flex items-center gap-2 text-sm font-semibold text-muted hover:text-fg">
             <ArrowLeft className="size-4" /> Back to playground

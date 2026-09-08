@@ -201,6 +201,8 @@ type PlaygroundState = {
   transformSelected: (rotationDelta: number, scaleFactor: number) => void;
   moveSelected: (axis: "x" | "y" | "z", distance: number) => void;
   rotateSelected: (axis: "x" | "y" | "z", degrees: number) => void;
+  rotateBody: (id: string, axis: "x" | "y" | "z", degrees: number) => void;
+  uprightSelected: () => void;
   spawnPreset: (preset: PresetKind) => void;
   saveStructure: () => boolean;
   loadStructure: () => boolean;
@@ -356,6 +358,24 @@ export const usePlayground = create<PlaygroundState>((set) => ({
         rotation[index] += (degrees * Math.PI) / 180;
         return { ...body, rotation };
       }),
+    })),
+  rotateBody: (id, axis, degrees) =>
+    set((state) => ({
+      bodies: state.bodies.map((body) => {
+        if (body.id !== id) return body;
+        const rotation = [...body.rotation] as [number, number, number];
+        const index = axis === "x" ? 0 : axis === "y" ? 1 : 2;
+        rotation[index] += (degrees * Math.PI) / 180;
+        return { ...body, rotation };
+      }),
+    })),
+  uprightSelected: () =>
+    set((state) => ({
+      bodies: state.bodies.map((body) =>
+        body.id === state.selectedBodyId
+          ? { ...body, rotation: [0, body.rotation[1], 0] as [number, number, number] }
+          : body,
+      ),
     })),
   spawnPreset: (preset) =>
     set((state) => {

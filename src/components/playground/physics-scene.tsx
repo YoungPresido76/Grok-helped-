@@ -9,7 +9,7 @@ import {
   type RapierRigidBody,
 } from "@react-three/rapier";
 import { useEffect, useMemo, useRef } from "react";
-import { Color, Euler, MeshStandardMaterial, Plane, Quaternion, Vector2, Vector3 } from "three";
+import { CanvasTexture, Color, Euler, Group, MeshStandardMaterial, Plane, Quaternion, SRGBColorSpace, Vector2, Vector3 } from "three";
 import { orbitControlsRef } from "./orbit-controls";
 import { liveBodyPoses, MATERIALS, usePlayground, type ShapeKind, type SpawnedBody } from "./store";
 
@@ -29,6 +29,7 @@ const rayOrigin = { x: 0, y: 0, z: 0 };
 const rayDir = { x: 0, y: 0, z: 1 };
 
 const bodyRefs = new Map<string, RapierRigidBody>();
+const rotationGizmoGroupRef: { current: Group | null } = { current: null };
 
 function bodyIdFor(api: RapierRigidBody) {
   for (const [id, body] of bodyRefs) {
@@ -82,13 +83,18 @@ function ShapeBody({ body, selected }: { body: SpawnedBody; selected: boolean })
   useEffect(() => {
     const api = bodyRefs.get(body.id);
     if (!api || !api.isValid()) return;
+    api.setTranslation({ x: body.position[0], y: body.position[1], z: body.position[2] }, true);
+  }, [body.id, body.position]);
+
+  useEffect(() => {
+    const api = bodyRefs.get(body.id);
+    if (!api || !api.isValid()) return;
     const euler = new Euler(body.rotation[0], body.rotation[1], body.rotation[2]);
     const quaternion = new Quaternion().setFromEuler(euler);
-    api.setTranslation({ x: body.position[0], y: body.position[1], z: body.position[2] }, true);
     api.setRotation({ x: quaternion.x, y: quaternion.y, z: quaternion.z, w: quaternion.w }, true);
     api.setLinvel({ x: 0, y: 0, z: 0 }, true);
     api.setAngvel({ x: 0, y: 0, z: 0 }, true);
-  }, [body.id, body.position, body.rotation]);
+  }, [body.id, body.rotation]);
 
   return (
     <RigidBody
@@ -96,7 +102,7 @@ function ShapeBody({ body, selected }: { body: SpawnedBody; selected: boolean })
         if (api) bodyRefs.set(body.id, api);
         else bodyRefs.delete(body.id);
       }}
-      type={body.locked ? "kinematicPosition" : "dynamic"}
+      type={body.locked || selected ? "kinematicPosition" : "dynamic"}
       position={body.position}
       rotation={body.rotation}
       scale={body.scale}
@@ -188,6 +194,154 @@ function setNdc(event: PointerEvent, el: HTMLCanvasElement) {
   pointerNdc.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
 }
 
+const GIZMO_AXES = [
+  { axis: "x" as const, color: "#ef6b67", ringRotation: [0, Math.PI / 2, 0] as [number, number, number], lineRotation: [0, 0, Math.PI / 2] as [number, number, number], end: [1.25, 0, 0] as [number, number, number] },
+  { axis: "y" as const, color: "#75c58b", ringRotation: [Math.PI / 2, 0, 0] as [number, number, number], lineRotation: [0, 0, 0] as [number, number, number], end: [0, 1.25, 0] as [number, number, number] },
+  { axis: "z" as const, color: "#72a9e8", ringRotation: [0, 0, 0] as [number, number, number], lineRotation: [Math.PI / 2, 0, 0] as [number, number, number], end: [0, 0, 1.25] as [number, number, number] },
+];
+
+function AxisLabel({ axis, color, position }: { axis: "x" | "y" | "z"; color: string; position: [number, number, number] }) {
+  const texture = useMemo(() => {
+    if (typeof document === "undefined") return null;
+    const canvas = document.createElement("canvas");
+    canvas.width = 96;
+    canvas.height = 96;
+    const context = canvas.getContext("2d");
+    if (!context) return null;
+    context.clearRect(0, 0, canvas.width, canvas.height);
+    context.fillStyle = color;
+    context.beginPath();
+    context.arc(48, 48, 38, 0, Math.PI * 2);
+    context.fill();
+    context.fillStyle = "#101216";
+    context.font = "700 56px Outfit, sans-serif";
+    context.textAlign = "center";
+    context.textBaseline = "middle";
+    context.fillText(axis.toUpperCase(), 48, 49);
+    const next = new CanvasTexture(canvas);
+    next.colorSpace = SRGBColorSpace;
+    return next;
+  }, [axis, color]);
+
+  useEffect(() => () => texture?.dispose(), [texture]);
+  if (!texture) return null;
+  return (
+    <sprite position={position} scale={[0.42, 0.42, 0.42]} userData={{ rotationAxis: axis }}>
+      <spriteMaterial map={texture} transparent depthTest={false} depthWrite={false} />
+    </sprite>
+  );
+}
+
+function RotationGizmo() {
+  const { camera, gl, raycaster } = useThree();
+  const selectedBodyId = usePlayground((s) => s.selectedBodyId);
+  const rotateBody = usePlayground((s) => s.rotateBody);
+  const setDragging = usePlayground((s) => s.setDragging);
+  const selected = usePlayground((s) => s.bodies.find((body) => body.id === s.selectedBodyId));
+  const activeRotation = useRef<{
+    axis: "x" | "y" | "z";
+    pointerId: number;
+    lastX: number;
+    lastY: number;
+  } | null>(null);
+
+  useFrame(() => {
+    const group = rotationGizmoGroupRef.current;
+    const api = selectedBodyId ? bodyRefs.get(selectedBodyId) : null;
+    if (!group || !api || !api.isValid() || !selected) {
+      if (group) group.visible = false;
+      return;
+    }
+    const position = api.translation();
+    const rotation = api.rotation();
+    group.visible = true;
+    group.position.set(position.x, position.y, position.z);
+    group.quaternion.set(rotation.x, rotation.y, rotation.z, rotation.w);
+    const distance = camera.position.distanceTo(group.position);
+    group.scale.setScalar(Math.max(0.72, Math.min(1.8, distance * 0.11)));
+  });
+
+  useEffect(() => {
+    const el = gl.domElement;
+    const onDown = (event: PointerEvent) => {
+      if (event.button !== 0 || !selectedBodyId || selected?.locked) return;
+      const group = rotationGizmoGroupRef.current;
+      if (!group?.visible) return;
+      setNdc(event, el);
+      const hit = raycaster
+        .intersectObject(group, true)
+        .find((entry) => entry.object.userData.rotationAxis) as { object: { userData: { rotationAxis?: "x" | "y" | "z" } } } | undefined;
+      const axis = hit?.object.userData.rotationAxis;
+      if (!axis) return;
+      event.stopImmediatePropagation();
+      event.preventDefault();
+      activeRotation.current = { axis, pointerId: event.pointerId, lastX: event.clientX, lastY: event.clientY };
+      if (orbitControlsRef.current) orbitControlsRef.current.enabled = false;
+      setDragging(true);
+      el.style.cursor = "grabbing";
+      try {
+        el.setPointerCapture(event.pointerId);
+      } catch {
+        /* best-effort */
+      }
+    };
+    const onMove = (event: PointerEvent) => {
+      const active = activeRotation.current;
+      if (!active || event.pointerId !== active.pointerId) return;
+      event.stopImmediatePropagation();
+      event.preventDefault();
+      const horizontal = event.clientX - active.lastX;
+      const vertical = event.clientY - active.lastY;
+      const delta = active.axis === "x" ? -vertical : horizontal;
+      if (delta !== 0 && selectedBodyId) rotateBody(selectedBodyId, active.axis, delta * 0.7);
+      active.lastX = event.clientX;
+      active.lastY = event.clientY;
+    };
+    const onEnd = (event: PointerEvent) => {
+      const active = activeRotation.current;
+      if (!active || event.pointerId !== active.pointerId) return;
+      event.stopImmediatePropagation();
+      activeRotation.current = null;
+      if (orbitControlsRef.current) orbitControlsRef.current.enabled = true;
+      setDragging(false);
+      el.style.cursor = "auto";
+      try {
+        el.releasePointerCapture(event.pointerId);
+      } catch {
+        /* already released */
+      }
+    };
+    el.addEventListener("pointerdown", onDown, { capture: true });
+    el.addEventListener("pointermove", onMove, { capture: true });
+    el.addEventListener("pointerup", onEnd, { capture: true });
+    el.addEventListener("pointercancel", onEnd, { capture: true });
+    return () => {
+      el.removeEventListener("pointerdown", onDown, { capture: true });
+      el.removeEventListener("pointermove", onMove, { capture: true });
+      el.removeEventListener("pointerup", onEnd, { capture: true });
+      el.removeEventListener("pointercancel", onEnd, { capture: true });
+    };
+  }, [gl, raycaster, rotateBody, selected, selectedBodyId, setDragging]);
+
+  return (
+    <group ref={rotationGizmoGroupRef} visible={false} renderOrder={20}>
+      {GIZMO_AXES.map(({ axis, color, ringRotation, lineRotation, end }) => (
+        <group key={axis} userData={{ rotationAxis: axis }}>
+          <mesh rotation={ringRotation} userData={{ rotationAxis: axis }} renderOrder={21}>
+            <torusGeometry args={[0.92, 0.035, 8, 64]} />
+            <meshBasicMaterial color={color} transparent opacity={0.9} depthTest={false} depthWrite={false} />
+          </mesh>
+          <mesh rotation={lineRotation} position={end.map((value) => value / 2) as [number, number, number]} userData={{ rotationAxis: axis }} renderOrder={21}>
+            <cylinderGeometry args={[0.025, 0.025, 1.15, 8]} />
+            <meshBasicMaterial color={color} depthTest={false} depthWrite={false} />
+          </mesh>
+          <AxisLabel axis={axis} color={color} position={end} />
+        </group>
+      ))}
+    </group>
+  );
+}
+
 function GrabController() {
   const { gl, camera, raycaster } = useThree();
   const { world, rapier } = useRapier();
@@ -232,7 +386,7 @@ function GrabController() {
         undefined,
         (collider) => {
           const parent = collider.parent();
-          return parent !== null && parent.isDynamic();
+          return parent !== null && (parent.isDynamic() || parent.isKinematic());
         },
       );
       if (!hit) return null;
@@ -248,6 +402,10 @@ function GrabController() {
     const onDown = (event: PointerEvent) => {
       if (event.button !== 0) return;
       setNdc(event, el);
+      const gizmo = rotationGizmoGroupRef.current;
+      if (gizmo?.visible && raycaster.intersectObject(gizmo, true).some((entry) => entry.object.userData.rotationAxis)) {
+        return;
+      }
       const picked = pickDynamic();
       if (!picked || !picked.body.isValid()) return;
 
@@ -334,13 +492,19 @@ function GrabController() {
       const active = grab.current;
       if (!active || event.pointerId !== active.pointerId) return;
       if (active.body.isValid()) {
-        active.body.setBodyType(rapier.RigidBodyType.Dynamic, true);
-        const speed = active.velocity.length();
-        if (speed > 18) active.velocity.multiplyScalar(18 / speed);
-        active.body.setLinvel(
-          { x: active.velocity.x, y: active.velocity.y, z: active.velocity.z },
-          true,
-        );
+        const remainsInEditMode = selectedBodyId !== null && bodyIdFor(active.body) === selectedBodyId;
+        if (!remainsInEditMode) {
+          active.body.setBodyType(rapier.RigidBodyType.Dynamic, true);
+          const speed = active.velocity.length();
+          if (speed > 18) active.velocity.multiplyScalar(18 / speed);
+          active.body.setLinvel(
+            { x: active.velocity.x, y: active.velocity.y, z: active.velocity.z },
+            true,
+          );
+        } else {
+          active.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
+          active.body.setAngvel({ x: 0, y: 0, z: 0 }, true);
+        }
       }
       grab.current = null;
       if (orbitControlsRef.current) orbitControlsRef.current.enabled = true;
@@ -456,6 +620,7 @@ export default function PhysicsScene() {
       <PhysicsArena />
       <Bodies />
       <WeldJoints />
+      <RotationGizmo />
       <GrabController />
       <BodyCuller />
     </Physics>
