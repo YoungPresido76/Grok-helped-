@@ -303,13 +303,14 @@ export function resolveOgTitle(
   host = "",
   documentTitle = "",
 ) {
-  const fromSite = String(site.title ?? "").trim();
-  if (fromSite) return fromSite;
   const fromDoc = String(documentTitle ?? "").trim();
   if (fromDoc) return fromDoc;
+  const fromArg = String(appName ?? "").trim();
+  if (fromArg && fromArg !== DEFAULT_APP_NAME) return fromArg;
+  const fromSite = String(site.title ?? "").trim();
+  if (fromSite) return fromSite;
   const fromHost = appNameFromHost(host);
   if (fromHost && fromHost !== DEFAULT_APP_NAME) return fromHost;
-  const fromArg = String(appName ?? "").trim();
   return fromArg || DEFAULT_APP_NAME;
 }
 
@@ -406,10 +407,16 @@ export function normalizeHeadContext(ctx = {}) {
   // public/og.jpg generated after that snapshot (or missed by a wrong cwd)
   // wins over the og.grok.me placeholder. Vercel has no public/ to read, so
   // a correct bake is unchanged.
-  const site = applyCustomCardFromFs(
+  let site = applyCustomCardFromFs(
     ctx.site !== undefined ? ctx.site : snapshotOgIdentity(cwd).site,
     cwd,
   );
+  // A workspace bake is the app's default identity, not an override for a
+  // published host. Explicit middleware context still owns its site title.
+  if (ctx.site === undefined && ctx.host) {
+    site = { ...site };
+    delete site.title;
+  }
   const appName = resolveOgTitle(site, ctx.appName ?? DEFAULT_APP_NAME, ctx.host ?? "");
   return {
     appName,
