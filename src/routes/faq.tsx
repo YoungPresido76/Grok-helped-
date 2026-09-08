@@ -1,0 +1,46 @@
+import { Link } from "@tanstack/react-router";
+import { ArrowLeft, BookOpen, CircleHelp } from "lucide-react";
+import { createFileRoute } from "@tanstack/react-router";
+
+export const Route = createFileRoute("/faq")({ component: FaqPage });
+
+const questions = [
+  ["What is Dropyard?", "Dropyard is a small 3D physics construction sandbox. Add pieces, let gravity act on them, join them with welds, and experiment with structures that behave like physical objects."],
+  ["How do I select a piece?", "Click a body in the scene. The selected body becomes the target for Scale mode controls. In Weld and Demolish modes, click a first body and then a second body to complete the operation."],
+  ["Why did my weld not work?", "Welding requires the two pieces to be close enough—roughly 2.4 world units. Move them nearer, switch to Weld, and try again. Weld mode also snaps the second piece into a stable position."],
+  ["What does Demolish remove?", "Demolish removes only the fixed joint between the two selected bodies. It does not delete either body or any other welds, so the rest of your structure remains intact."],
+  ["Where are my saved structures?", "Save data is kept in this browser's local storage on this device. It is not an online account backup. Use Save before major experiments and Load to restore the latest saved version."],
+  ["What is saved?", "The save includes body types, colors, live positions, rotations, scales, weld connections, gravity, and bounce. Older saves without scale data are upgraded to normal size when loaded."],
+  ["How do I make a house-like starting point?", "Use Floor for a base, Wall for a side, and Pillar for supports. Rotate and scale pieces, then weld them after they are positioned. Repeat the pattern for additional walls and a roof."],
+  ["Can I change the physics feel?", "Yes. Gravity controls how strongly pieces fall, while Bounce controls impact restitution. Lower bounce creates more grounded behavior; higher values make impacts more energetic."],
+];
+
+function FaqPage() {
+  return (
+    <main className="min-h-dvh bg-bg px-4 py-6 text-fg sm:px-8 sm:py-10">
+      <div className="mx-auto max-w-4xl">
+        <nav className="mb-12 flex items-center justify-between">
+          <Link to="/" className="inline-flex items-center gap-2 text-sm font-semibold text-muted hover:text-fg">
+            <ArrowLeft className="size-4" /> Back to playground
+          </Link>
+          <Link to="/tutorial" className="inline-flex items-center gap-2 text-sm font-semibold text-muted hover:text-fg">
+            <BookOpen className="size-4" /> Tutorial
+          </Link>
+        </nav>
+        <header className="max-w-2xl">
+          <p className="mb-3 inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-accent"><CircleHelp className="size-4" /> Help center</p>
+          <h1 className="text-4xl font-semibold tracking-tight sm:text-6xl">Frequently asked questions.</h1>
+          <p className="mt-5 text-base leading-7 text-muted sm:text-lg">Everything you need to start building, saving, and taking structures apart.</p>
+        </header>
+        <section className="mt-12 divide-y divide-border rounded-toolbar border border-border bg-surface px-5 sm:px-8">
+          {questions.map(([question, answer]) => (
+            <article key={question} className="py-6">
+              <h2 className="font-semibold">{question}</h2>
+              <p className="mt-2 max-w-3xl text-sm leading-6 text-muted">{answer}</p>
+            </article>
+          ))}
+        </section>
+      </div>
+    </main>
+  );
+}
