@@ -48,15 +48,7 @@ function PhysicsArena() {
         friction={GROUND_FRICTION}
         restitution={Math.max(GROUND_RESTITUTION, groundRestitution)}
       >
-        <CuboidCollider args={[16, 0.2, 16]} position={[0, -1.2, 0]} />
-      </RigidBody>
-      <RigidBody
-        type="fixed"
-        colliders={false}
-        friction={0.82}
-        restitution={Math.max(GROUND_RESTITUTION, groundRestitution)}
-      >
-        <CylinderCollider args={[0.25, 6.5]} />
+        <CuboidCollider args={[16, 0.2, 16]} position={[0, -0.2, 0]} />
       </RigidBody>
     </>
   );
@@ -83,6 +75,17 @@ function ShapeBody({ body }: { body: SpawnedBody }) {
   const angularDamping = body.kind === "sphere" ? 0.62 : 0.48;
 
   useEffect(() => () => material.dispose(), [material]);
+
+  useEffect(() => {
+    const api = bodyRefs.get(body.id);
+    if (!api || !api.isValid()) return;
+    const euler = new Euler(body.rotation[0], body.rotation[1], body.rotation[2]);
+    const quaternion = new Quaternion().setFromEuler(euler);
+    api.setTranslation({ x: body.position[0], y: body.position[1], z: body.position[2] }, true);
+    api.setRotation({ x: quaternion.x, y: quaternion.y, z: quaternion.z, w: quaternion.w }, true);
+    api.setLinvel({ x: 0, y: 0, z: 0 }, true);
+    api.setAngvel({ x: 0, y: 0, z: 0 }, true);
+  }, [body.id, body.position, body.rotation]);
 
   return (
     <RigidBody
