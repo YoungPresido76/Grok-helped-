@@ -1,5 +1,7 @@
 import {
+  BookOpen,
   Circle,
+  CircleHelp,
   Cuboid,
   Cylinder,
   FolderOpen,
@@ -14,6 +16,7 @@ import {
   Shuffle,
   Trash2,
 } from "lucide-react";
+import { Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
@@ -78,6 +81,18 @@ export function Toolbar() {
           <p className="mt-0.5 text-xs text-muted sm:text-sm">Physics playground</p>
         </div>
         <div className="pointer-events-auto flex items-center gap-2">
+          <Link
+            to="/tutorial"
+            className="hidden items-center gap-1.5 rounded-sm border border-border bg-surface px-3 py-2 text-xs font-semibold text-muted hover:text-fg sm:inline-flex"
+          >
+            <BookOpen className="size-4" /> Guide
+          </Link>
+          <Link
+            to="/faq"
+            className="hidden items-center gap-1.5 rounded-sm border border-border bg-surface px-3 py-2 text-xs font-semibold text-muted hover:text-fg sm:inline-flex"
+          >
+            <CircleHelp className="size-4" /> FAQ
+          </Link>
           <p className="rounded-sm border border-border bg-surface px-3 py-2 text-xs font-medium tabular-nums text-muted">
             <span className="text-fg">{count}</span> bodies
           </p>
