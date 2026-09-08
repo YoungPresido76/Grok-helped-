@@ -201,9 +201,9 @@ function setNdc(event: PointerEvent, el: HTMLCanvasElement) {
 }
 
 const GIZMO_AXES = [
-  { axis: "x" as const, color: "#ef6b67", ringRotation: [0, Math.PI / 2, 0] as [number, number, number], lineRotation: [0, 0, Math.PI / 2] as [number, number, number], end: [1.25, 0, 0] as [number, number, number] },
-  { axis: "y" as const, color: "#75c58b", ringRotation: [Math.PI / 2, 0, 0] as [number, number, number], lineRotation: [0, 0, 0] as [number, number, number], end: [0, 1.25, 0] as [number, number, number] },
-  { axis: "z" as const, color: "#72a9e8", ringRotation: [0, 0, 0] as [number, number, number], lineRotation: [Math.PI / 2, 0, 0] as [number, number, number], end: [0, 0, 1.25] as [number, number, number] },
+  { axis: "x" as const, color: "#ef6b67", lineRotation: [0, 0, Math.PI / 2] as [number, number, number], end: [1.25, 0, 0] as [number, number, number] },
+  { axis: "y" as const, color: "#75c58b", lineRotation: [0, 0, 0] as [number, number, number], end: [0, 1.25, 0] as [number, number, number] },
+  { axis: "z" as const, color: "#72a9e8", lineRotation: [Math.PI / 2, 0, 0] as [number, number, number], end: [0, 0, 1.25] as [number, number, number] },
 ];
 
 function AxisLabel({ axis, color, position }: { axis: "x" | "y" | "z"; color: string; position: [number, number, number] }) {
@@ -331,12 +331,8 @@ function RotationGizmo() {
 
   return (
     <group ref={rotationGizmoGroupRef} visible={false} renderOrder={20}>
-      {GIZMO_AXES.map(({ axis, color, ringRotation, lineRotation, end }) => (
+      {GIZMO_AXES.map(({ axis, color, lineRotation, end }) => (
         <group key={axis} userData={{ rotationAxis: axis }}>
-          <mesh rotation={ringRotation} userData={{ rotationAxis: axis }} renderOrder={21}>
-            <torusGeometry args={[0.92, 0.035, 8, 64]} />
-            <meshBasicMaterial color={color} transparent opacity={0.9} depthTest={false} depthWrite={false} />
-          </mesh>
           <mesh rotation={lineRotation} position={end.map((value) => value / 2) as [number, number, number]} userData={{ rotationAxis: axis }} renderOrder={21}>
             <cylinderGeometry args={[0.025, 0.025, 1.15, 8]} />
             <meshBasicMaterial color={color} depthTest={false} depthWrite={false} />
