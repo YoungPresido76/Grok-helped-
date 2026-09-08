@@ -10,6 +10,7 @@ export type SpawnedBody = {
   rotation: [number, number, number];
   scale: [number, number, number];
   material: MaterialKind;
+  locked: boolean;
   color: string;
   angularVelocity: [number, number, number];
 };
@@ -104,6 +105,7 @@ function parseSavedStructure(raw: string | null): SavedStructure | null {
         ? (body as SpawnedBody).scale
         : ([1, 1, 1] as [number, number, number]),
       material: (body as SpawnedBody & { material?: MaterialKind }).material ?? "wood",
+      locked: Boolean((body as SpawnedBody & { locked?: unknown }).locked),
     }));
     const ids = new Set(normalizedBodies.map((body) => body.id));
     const welds = value.welds.filter(
@@ -147,6 +149,7 @@ export function makeBody(
     rotation: [rand(-0.35, 0.35), rand(-Math.PI, Math.PI), rand(-0.35, 0.35)],
     scale: [1, 1, 1],
     material: "wood",
+    locked: false,
     color: pick(PALETTES[kind]),
     // A small initial spin gives the pile life without making every piece
     // tumble like a rubber toy when it lands.
@@ -176,6 +179,7 @@ type PlaygroundState = {
   demolitionMode: boolean;
   activeTool: ConstructionTool;
   selectedBodyId: string | null;
+  spawnCount: number;
   spawn: (kind: ShapeKind, position?: [number, number, number]) => void;
   scatter: () => void;
   remove: (id: string) => void;
@@ -187,6 +191,8 @@ type PlaygroundState = {
   setActiveTool: (tool: ConstructionTool) => void;
   setSelectedBodyId: (id: string | null) => void;
   setSelectedMaterial: (material: MaterialKind) => void;
+  toggleSelectedLock: () => void;
+  setSpawnCount: (count: number) => void;
   setBodyPose: (
     id: string,
     position: [number, number, number],
@@ -217,6 +223,7 @@ export const usePlayground = create<PlaygroundState>((set) => ({
   demolitionMode: false,
   activeTool: "spawn",
   selectedBodyId: null,
+  spawnCount: 1,
   spawn: (kind, position) =>
     set((state) => {
       const next = [...state.bodies, makeBody(kind, position)];
@@ -285,12 +292,12 @@ export const usePlayground = create<PlaygroundState>((set) => ({
   setDemolitionMode: (value) =>
     set({ demolitionMode: value, weldMode: false, activeTool: value ? "demolish" : "spawn", selectedBodyId: null }),
   setActiveTool: (tool) =>
-    set({
+    set((state) => ({
       activeTool: tool,
       weldMode: tool === "weld",
       demolitionMode: tool === "demolish",
-      selectedBodyId: null,
-    }),
+      selectedBodyId: tool === "spawn" || tool === "demolish" ? null : state.selectedBodyId,
+    })),
   setSelectedBodyId: (id) => set({ selectedBodyId: id }),
   setSelectedMaterial: (material) =>
     set((state) => ({
@@ -300,6 +307,13 @@ export const usePlayground = create<PlaygroundState>((set) => ({
           : body,
       ),
     })),
+  toggleSelectedLock: () =>
+    set((state) => ({
+      bodies: state.bodies.map((body) =>
+        body.id === state.selectedBodyId ? { ...body, locked: !body.locked } : body,
+      ),
+    })),
+  setSpawnCount: (count) => set({ spawnCount: Math.max(1, Math.min(10, Math.round(count))) }),
   setBodyPose: (id, position, rotation) =>
     set((state) => ({
       bodies: state.bodies.map((body) =>

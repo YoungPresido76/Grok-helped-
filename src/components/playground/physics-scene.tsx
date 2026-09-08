@@ -64,7 +64,7 @@ function shapeMaterial(kind: ShapeKind, color: string) {
   });
 }
 
-function ShapeBody({ body }: { body: SpawnedBody }) {
+function ShapeBody({ body, selected }: { body: SpawnedBody; selected: boolean }) {
   const restitution = usePlayground((s) => s.restitution);
   const materialProfile = MATERIALS[body.material];
   const material = useMemo(
@@ -76,6 +76,8 @@ function ShapeBody({ body }: { body: SpawnedBody }) {
   const angularDamping = body.kind === "sphere" ? 0.62 : 0.48;
 
   useEffect(() => () => material.dispose(), [material]);
+  material.emissive.set(selected ? "#f4cf72" : "#000000");
+  material.emissiveIntensity = selected ? 0.42 : 0;
 
   useEffect(() => {
     const api = bodyRefs.get(body.id);
@@ -94,6 +96,7 @@ function ShapeBody({ body }: { body: SpawnedBody }) {
         if (api) bodyRefs.set(body.id, api);
         else bodyRefs.delete(body.id);
       }}
+      type={body.locked ? "kinematicPosition" : "dynamic"}
       position={body.position}
       rotation={body.rotation}
       scale={body.scale}
@@ -120,10 +123,11 @@ function ShapeBody({ body }: { body: SpawnedBody }) {
 
 function Bodies() {
   const bodies = usePlayground((s) => s.bodies);
+  const selectedBodyId = usePlayground((s) => s.selectedBodyId);
   return (
     <>
       {bodies.map((body) => (
-        <ShapeBody key={body.id} body={body} />
+        <ShapeBody key={body.id} body={body} selected={body.id === selectedBodyId} />
       ))}
     </>
   );
@@ -248,6 +252,7 @@ function GrabController() {
 
       event.stopImmediatePropagation();
       event.preventDefault();
+      window.dispatchEvent(new Event("dropyard:scene-touch"));
 
       if (weldMode || demolitionMode) {
         const pickedId = bodyIdFor(picked.body);
@@ -289,6 +294,8 @@ function GrabController() {
 
       const pickedId = bodyIdFor(picked.body);
       if (pickedId) setSelectedBodyId(pickedId);
+      const pickedState = usePlayground.getState().bodies.find((body) => body.id === pickedId);
+      if (pickedState?.locked) return;
       picked.body.wakeUp();
       picked.body.setBodyType(rapier.RigidBodyType.KinematicPositionBased, true);
       picked.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
