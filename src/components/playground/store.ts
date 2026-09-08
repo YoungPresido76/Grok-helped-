@@ -5,6 +5,8 @@ export type MaterialKind = "wood" | "steel" | "glass";
 
 export type SpawnedBody = {
   id: string;
+  name: string;
+  visible: boolean;
   kind: ShapeKind;
   position: [number, number, number];
   rotation: [number, number, number];
@@ -22,7 +24,7 @@ export type Weld = {
 };
 
 export type SavedStructure = {
-  version: 1 | 2;
+  version: 1 | 2 | 3;
   savedAt: string;
   bodies: SpawnedBody[];
   welds: Weld[];
@@ -43,6 +45,15 @@ export const liveBodyPoses = new Map<
 >();
 
 const MAX_BODIES = 72;
+type HistoryFrame = Pick<SavedStructure, "bodies" | "welds" | "gravity" | "restitution">;
+
+function frameOf(state: PlaygroundState): HistoryFrame {
+  return { bodies: state.bodies, welds: state.welds, gravity: state.gravity, restitution: state.restitution };
+}
+
+function withHistory(state: PlaygroundState, next: Partial<PlaygroundState>): Partial<PlaygroundState> {
+  return { ...next, historyPast: [...state.historyPast, frameOf(state)].slice(-50), historyFuture: [] };
+}
 
 const PALETTES: Record<ShapeKind, string[]> = {
   sphere: ["#c56a4a", "#d07a58", "#b85c40", "#a8523a"],
@@ -87,7 +98,7 @@ function parseSavedStructure(raw: string | null): SavedStructure | null {
   try {
     const value = JSON.parse(raw) as Partial<SavedStructure>;
     if (
-      (value.version !== 1 && value.version !== 2) ||
+      (value.version !== 1 && value.version !== 2 && value.version !== 3) ||
       !Array.isArray(value.bodies) ||
       !Array.isArray(value.welds) ||
       typeof value.gravity !== "number" ||
@@ -107,6 +118,8 @@ function parseSavedStructure(raw: string | null): SavedStructure | null {
     );
     const normalizedBodies = bodies.map((body) => ({
       ...body,
+      name: typeof (body as SpawnedBody & { name?: unknown }).name === "string" ? (body as SpawnedBody).name : `${body.kind} ${body.id.replace("body-", "")}`,
+      visible: (body as SpawnedBody & { visible?: unknown }).visible !== false,
       scale: isTuple((body as SpawnedBody & { scale?: unknown }).scale, 3)
         ? (body as SpawnedBody).scale
         : ([1, 1, 1] as [number, number, number]),
@@ -146,6 +159,8 @@ export function makeBody(
   const radius = Math.random() * spread;
   return {
     id: nextId(),
+    name: `${kind[0].toUpperCase()}${kind.slice(1)} ${seq}`,
+    visible: true,
     kind,
     position: position ?? [
       Math.cos(angle) * radius,
@@ -187,10 +202,21 @@ type PlaygroundState = {
   selectedBodyId: string | null;
   spawnCount: number;
   savedPlaygrounds: NamedPlayground[];
+  snapEnabled: boolean;
+  snapStep: number;
+  historyPast: HistoryFrame[];
+  historyFuture: HistoryFrame[];
   spawn: (kind: ShapeKind, position?: [number, number, number]) => void;
   scatter: () => void;
   remove: (id: string) => void;
   duplicateSelected: () => void;
+  newPlayground: () => void;
+  renameBody: (id: string, name: string) => void;
+  setSelectedTransform: (field: "position" | "rotation" | "scale", axis: 0 | 1 | 2, value: number) => void;
+  toggleBodyVisibility: (id: string) => void;
+  setSnap: (enabled: boolean, step?: number) => void;
+  undo: () => void;
+  redo: () => void;
   clear: () => void;
   weld: (bodyA: string, bodyB: string) => void;
   unweld: (bodyA: string, bodyB: string) => void;
@@ -239,15 +265,19 @@ export const usePlayground = create<PlaygroundState>((set) => ({
   selectedBodyId: null,
   spawnCount: 1,
   savedPlaygrounds: [],
+  snapEnabled: true,
+  snapStep: 0.25,
+  historyPast: [],
+  historyFuture: [],
   spawn: (kind, position) =>
     set((state) => {
       const next = [...state.bodies, makeBody(kind, position)];
       if (next.length > MAX_BODIES) next.splice(0, next.length - MAX_BODIES);
       const liveIds = new Set(next.map((body) => body.id));
-      return {
+      return withHistory(state, {
         bodies: next,
         welds: state.welds.filter((weld) => liveIds.has(weld.bodyA) && liveIds.has(weld.bodyB)),
-      };
+      });
     }),
   scatter: () =>
     set((state) => {
@@ -265,13 +295,13 @@ export const usePlayground = create<PlaygroundState>((set) => ({
       const next = [...state.bodies, ...extra];
       if (next.length > MAX_BODIES) next.splice(0, next.length - MAX_BODIES);
       const liveIds = new Set(next.map((body) => body.id));
-      return {
+      return withHistory(state, {
         bodies: next,
         welds: state.welds.filter((weld) => liveIds.has(weld.bodyA) && liveIds.has(weld.bodyB)),
-      };
+      });
     }),
   remove: (id) =>
-    set((state) => ({
+    set((state) => withHistory(state, {
       bodies: state.bodies.filter((body) => body.id !== id),
       welds: state.welds.filter((weld) => weld.bodyA !== id && weld.bodyB !== id),
       selectedBodyId: state.selectedBodyId === id ? null : state.selectedBodyId,
@@ -287,9 +317,29 @@ export const usePlayground = create<PlaygroundState>((set) => ({
         locked: false,
         angularVelocity: [0, 0, 0] as [number, number, number],
       };
-      return { bodies: [...state.bodies, copy].slice(-MAX_BODIES), selectedBodyId: copy.id };
+      return { ...withHistory(state, { bodies: [...state.bodies, copy].slice(-MAX_BODIES), selectedBodyId: copy.id }) };
     }),
-  clear: () => set({ bodies: [], welds: [], selectedBodyId: null }),
+  newPlayground: () => set((state) => withHistory(state, { bodies: [], welds: [], selectedBodyId: null, activeTool: "spawn", weldMode: false, demolitionMode: false })),
+  renameBody: (id, name) => set((state) => ({ bodies: state.bodies.map((body) => body.id === id ? { ...body, name: name.trim() || body.name } : body) })),
+  setSelectedTransform: (field, axis, value) => set((state) => withHistory(state, { bodies: state.bodies.map((body) => {
+    if (body.id !== state.selectedBodyId || !Number.isFinite(value)) return body;
+    const next = [...body[field]] as [number, number, number];
+    next[axis] = field === "rotation" ? (value * Math.PI) / 180 : Math.max(field === "scale" ? 0.25 : -50, Math.min(field === "scale" ? 4 : 50, value));
+    return { ...body, [field]: next };
+  }) })),
+  toggleBodyVisibility: (id) => set((state) => ({ bodies: state.bodies.map((body) => body.id === id ? { ...body, visible: !body.visible } : body) })),
+  setSnap: (enabled, step) => set({ snapEnabled: enabled, ...(step ? { snapStep: step } : {}) }),
+  undo: () => set((state) => {
+    const frame = state.historyPast.at(-1);
+    if (!frame) return state;
+    return { ...frame, historyPast: state.historyPast.slice(0, -1), historyFuture: [...state.historyFuture, frameOf(state)].slice(-50), selectedBodyId: null };
+  }),
+  redo: () => set((state) => {
+    const frame = state.historyFuture.at(-1);
+    if (!frame) return state;
+    return { ...frame, historyFuture: state.historyFuture.slice(0, -1), historyPast: [...state.historyPast, frameOf(state)].slice(-50), selectedBodyId: null };
+  }),
+  clear: () => set((state) => withHistory(state, { bodies: [], welds: [], selectedBodyId: null })),
   weld: (bodyA, bodyB) =>
     set((state) => {
       if (bodyA === bodyB) return state;
@@ -371,6 +421,7 @@ export const usePlayground = create<PlaygroundState>((set) => ({
         const position = [...body.position] as [number, number, number];
         const index = axis === "x" ? 0 : axis === "y" ? 1 : 2;
         position[index] += distance;
+        if (state.snapEnabled) position[index] = Math.round(position[index] / state.snapStep) * state.snapStep;
         position[1] = Math.max(0.5, position[1]);
         return { ...body, position };
       }),

@@ -12,6 +12,8 @@ import {
   Cuboid,
   Cylinder,
   FolderOpen,
+  Eye,
+  EyeOff,
   Hammer,
   Link2,
   Lock,
@@ -20,6 +22,7 @@ import {
   MoreHorizontal,
   Pause,
   Play,
+  Plus,
   RotateCcw,
   RotateCw,
   Save,
@@ -27,6 +30,8 @@ import {
   Triangle,
   Trash2,
   Unlock,
+  Undo2,
+  Redo2,
   Unlink2,
   X,
 } from "lucide-react";
@@ -71,9 +76,21 @@ export function Toolbar() {
   const paused = usePlayground((s) => s.paused);
   const togglePaused = usePlayground((s) => s.togglePaused);
   const count = usePlayground((s) => s.bodies.length);
+  const bodies = usePlayground((s) => s.bodies);
+  const newPlayground = usePlayground((s) => s.newPlayground);
+  const renameBody = usePlayground((s) => s.renameBody);
+  const toggleBodyVisibility = usePlayground((s) => s.toggleBodyVisibility);
+  const snapEnabled = usePlayground((s) => s.snapEnabled);
+  const snapStep = usePlayground((s) => s.snapStep);
+  const setSnap = usePlayground((s) => s.setSnap);
+  const undo = usePlayground((s) => s.undo);
+  const redo = usePlayground((s) => s.redo);
+  const canUndo = usePlayground((s) => s.historyPast.length > 0);
+  const canRedo = usePlayground((s) => s.historyFuture.length > 0);
   const weldMode = usePlayground((s) => s.weldMode);
   const demolitionMode = usePlayground((s) => s.demolitionMode);
   const selectedBodyId = usePlayground((s) => s.selectedBodyId);
+  const setSelectedBodyId = usePlayground((s) => s.setSelectedBodyId);
   const activeTool = usePlayground((s) => s.activeTool);
   const setActiveTool = usePlayground((s) => s.setActiveTool);
   const saveStructure = usePlayground((s) => s.saveStructure);
@@ -93,6 +110,9 @@ export function Toolbar() {
   const setSpawnCount = usePlayground((s) => s.setSpawnCount);
   const selectedLocked = usePlayground((s) => s.bodies.find((body) => body.id === s.selectedBodyId)?.locked ?? false);
   const selectedMaterial = usePlayground((s) => s.bodies.find((body) => body.id === s.selectedBodyId)?.material ?? "wood");
+  const selectedBody = usePlayground((s) => s.bodies.find((body) => body.id === s.selectedBodyId));
+  const setSelectedTransform = usePlayground((s) => s.setSelectedTransform);
+  const [nameDraft, setNameDraft] = useState("");
   const moveSelected = usePlayground((s) => s.moveSelected);
   const rotateSelected = usePlayground((s) => s.rotateSelected);
   const spawnPreset = usePlayground((s) => s.spawnPreset);
@@ -101,6 +121,8 @@ export function Toolbar() {
   const [saveName, setSaveName] = useState("");
   const [objectMenuOpen, setObjectMenuOpen] = useState(false);
   const selected = selectedBodyId !== null;
+
+  useEffect(() => setNameDraft(selectedBody?.name ?? ""), [selectedBody?.id, selectedBody?.name]);
 
   useEffect(() => {
     if (loadStructure()) setStatus("Loaded saved structure");
@@ -154,10 +176,20 @@ export function Toolbar() {
             <Link to="/tutorial" className="inline-flex min-h-10 items-center justify-center gap-2 rounded-sm bg-surface-2 px-3 text-xs font-semibold text-fg hover:bg-border"><BookOpen className="size-4" /> Guide</Link>
             <Link to="/faq" className="inline-flex min-h-10 items-center justify-center gap-2 rounded-sm bg-surface-2 px-3 text-xs font-semibold text-fg hover:bg-border"><CircleHelp className="size-4" /> FAQs</Link>
           </div>
+          <div className="mb-3 flex flex-wrap gap-2 border-b border-border pb-3">
+            <Button variant="solid" onClick={() => { if (window.confirm("Create a new blank playground? Save this one first if you need it later.")) { newPlayground(); setStatus("New blank playground created"); } }}><Plus className="size-4" /> New Playground</Button>
+            <Button variant="muted" disabled={!canUndo} onClick={undo} title="Undo last edit"><Undo2 className="size-4" /> Undo</Button>
+            <Button variant="muted" disabled={!canRedo} onClick={redo} title="Redo last edit"><Redo2 className="size-4" /> Redo</Button>
+          </div>
 
           <div className="mb-3 border-b border-border pb-3">
             <p className="mb-2 text-xs font-semibold uppercase tracking-[0.14em] text-subtle">Saved playgrounds</p>
             {savedPlaygrounds.length === 0 ? <p className="text-xs text-muted">No named playgrounds yet.</p> : <div className="space-y-1">{savedPlaygrounds.slice().reverse().map((entry) => <div key={entry.name} className="flex items-center gap-2 rounded-sm bg-surface-2 px-2 py-1.5"><button type="button" className="min-w-0 flex-1 truncate text-left text-xs font-semibold text-fg hover:text-accent" onClick={() => setStatus(loadNamed(entry.name) ? `Loaded “${entry.name}”` : "Could not load playground")}>{entry.name}</button><button type="button" className="rounded-sm p-1 text-muted hover:bg-border hover:text-danger" onClick={() => deleteNamed(entry.name)} aria-label={`Delete saved playground ${entry.name}`}><Trash2 className="size-3.5" /></button></div>)}</div>}
+          </div>
+
+          <div className="mb-3 border-b border-border pb-3">
+            <div className="mb-2 flex items-center justify-between"><p className="text-xs font-semibold uppercase tracking-[0.14em] text-subtle">Outliner</p><label className="flex items-center gap-1.5 text-[11px] font-semibold text-muted"><input type="checkbox" checked={snapEnabled} onChange={(event) => setSnap(event.target.checked)} /> Snap <select value={snapStep} onChange={(event) => setSnap(snapEnabled, Number(event.target.value))} className="rounded-sm border border-border bg-surface-2 px-1 py-0.5 text-fg"><option value="0.1">0.1</option><option value="0.25">0.25</option><option value="0.5">0.5</option><option value="1">1</option></select></label></div>
+            <div className="max-h-40 space-y-1 overflow-y-auto">{bodies.length === 0 ? <p className="text-xs text-muted">Empty playground.</p> : bodies.slice().reverse().map((body) => <div key={body.id} className={cn("flex items-center gap-1 rounded-sm px-1.5 py-1", selectedBodyId === body.id ? "bg-accent/15" : "bg-surface-2")}><button type="button" className="min-w-0 flex-1 truncate text-left text-xs font-semibold text-fg hover:text-accent" onClick={() => { setSelectedBodyId(body.id); setActiveTool("select"); }}>{body.name}</button><button type="button" className="rounded-sm p-1 text-muted hover:bg-border" onClick={() => toggleBodyVisibility(body.id)} aria-label={`${body.visible ? "Hide" : "Show"} ${body.name}`}>{body.visible ? <Eye className="size-3.5" /> : <EyeOff className="size-3.5" />}</button><button type="button" className="rounded-sm p-1 text-muted hover:bg-border hover:text-danger" onClick={() => remove(body.id)} aria-label={`Delete ${body.name}`}><Trash2 className="size-3.5" /></button></div>)}</div>
           </div>
 
           <div className="grid grid-cols-2 gap-1 rounded-sm border border-border bg-surface-2 p-1 sm:grid-cols-5">
@@ -193,6 +225,7 @@ export function Toolbar() {
 
           {activeTool === "select" && <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-border pt-3"><span className="text-xs font-semibold text-muted">Material</span><select disabled={!selected} value={selectedMaterial} onChange={(event) => setSelectedMaterial(event.target.value as MaterialKind)} className="h-10 rounded-sm border border-border bg-surface-2 px-3 text-xs font-semibold text-fg"><option value="wood">Wood</option><option value="steel">Steel</option><option value="glass">Glass</option></select></div>}
           {activeTool === "select" && <div className="relative mt-3 flex items-center gap-2 border-t border-border pt-3"><span className="text-xs font-semibold text-muted">Selected object</span><Button variant="muted" size="icon" disabled={!selected} onClick={() => setObjectMenuOpen((value) => !value)} aria-label="Open selected object menu"><MoreHorizontal className="size-4" /></Button>{objectMenuOpen && selected && <div className="absolute left-28 top-10 z-10 flex min-w-44 flex-col gap-1 rounded-sm border border-border bg-surface p-1.5 shadow-toolbar"><button type="button" className="flex items-center gap-2 rounded-sm px-3 py-2 text-left text-xs font-semibold text-fg hover:bg-surface-2" onClick={() => { duplicateSelected(); setObjectMenuOpen(false); setStatus("Copied exact object and spawned it nearby"); }}><Copy className="size-4" /> Copy and spawn exact object</button><button type="button" className="flex items-center gap-2 rounded-sm px-3 py-2 text-left text-xs font-semibold text-danger hover:bg-surface-2" onClick={() => { if (selectedBodyId) remove(selectedBodyId); setObjectMenuOpen(false); setStatus("Object deleted"); }}><Trash2 className="size-4" /> Delete object</button></div>}</div>}
+          {activeTool === "select" && <div className="mt-3 grid gap-2 border-t border-border pt-3"><label className="text-xs font-semibold text-muted">Object name<input disabled={!selected} value={nameDraft} onChange={(event) => setNameDraft(event.target.value)} onBlur={() => selectedBodyId && renameBody(selectedBodyId, nameDraft)} className="mt-1 h-9 w-full rounded-sm border border-border bg-surface-2 px-2 text-xs text-fg" /></label>{selectedBody && <div className="grid grid-cols-3 gap-2">{(["position", "rotation", "scale"] as const).map((field) => <fieldset key={field} className="rounded-sm border border-border p-2"><legend className="px-1 text-[10px] font-semibold uppercase text-subtle">{field === "rotation" ? "Rotation °" : field}</legend>{[0, 1, 2].map((axis) => <input key={axis} type="number" step={field === "scale" ? "0.1" : "0.25"} value={field === "rotation" ? Number((selectedBody[field][axis] * 180 / Math.PI).toFixed(2)) : selectedBody[field][axis]} onChange={(event) => setSelectedTransform(field, axis as 0 | 1 | 2, Number(event.target.value))} className="mb-1 h-8 w-full rounded-sm border border-border bg-surface-2 px-1.5 text-xs text-fg" aria-label={`${field} ${axis === 0 ? "X" : axis === 1 ? "Y" : "Z"}`} />)}</fieldset>)}</div>}</div>}
           {activeTool === "select" && <div className="mt-3 flex flex-wrap items-center gap-2"><Button variant={selectedLocked ? "solid" : "muted"} disabled={!selected} onClick={toggleSelectedLock}>{selectedLocked ? <Unlock className="size-4" /> : <Lock className="size-4" />}{selectedLocked ? "Release lock" : "Lock in place"}</Button>{selected && <span className="text-xs text-muted">{selectedLocked ? "Locked mid-air or on the ground." : "Selection is stable while you edit; lock it to keep it fixed after deselection."}</span>}</div>}
 
           <div className="mt-3 grid grid-cols-1 gap-2 border-t border-border pt-3 sm:grid-cols-2 sm:gap-5"><Slider label="Gravity" value={gravity} min={0} max={20} step={0.1} display={gravity.toFixed(1)} onValueChange={setGravity} /><Slider label="Bounce" value={restitution} min={0} max={1} step={0.01} display={restitution.toFixed(2)} onValueChange={setRestitution} /></div>

@@ -46,6 +46,11 @@ const steps = [
     title: "Plan, save, and reuse",
     body: "Open the hamburger menu in the top-left. Name and save the full playground, load any saved version from the list, or spawn a Sphere, Box, Cylinder, Cone, Torus, or Capsule from the object library. Select an object to change its material, lock it as an anchor, copy it exactly, or delete it from the scene.",
   },
+  {
+    icon: RotateCcw,
+    title: "Work precisely",
+    body: "Use New Playground for a blank plan, then use the Outliner to select, rename, hide, or delete objects. Turn on Snap for aligned movement, edit exact Position / Rotation / Scale values when needed, and use Undo or Redo whenever you want to step through recent changes.",
+  },
 ];
 
 function TutorialPage() {

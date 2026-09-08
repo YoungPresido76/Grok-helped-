@@ -11,10 +11,23 @@ export function Playground() {
   const setActiveTool = usePlayground((s) => s.setActiveTool);
   const uprightSelected = usePlayground((s) => s.uprightSelected);
   const rotateSelected = usePlayground((s) => s.rotateSelected);
+  const undo = usePlayground((s) => s.undo);
+  const redo = usePlayground((s) => s.redo);
+  const newPlayground = usePlayground((s) => s.newPlayground);
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (event.repeat) return;
+      if ((event.metaKey || event.ctrlKey) && event.code === "KeyZ") {
+        event.preventDefault();
+        if (event.shiftKey) redo(); else undo();
+        return;
+      }
+      if ((event.metaKey || event.ctrlKey) && event.code === "KeyY") {
+        event.preventDefault();
+        redo();
+        return;
+      }
       if (event.metaKey || event.ctrlKey || event.altKey) return;
       const target = event.target as HTMLElement | null;
       if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA")) return;
@@ -64,11 +77,16 @@ export function Playground() {
       if (event.code === "Space") {
         event.preventDefault();
         togglePaused();
+        return;
+      }
+      if (event.code === "KeyN") {
+        event.preventDefault();
+        newPlayground();
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [clear, rotateSelected, scatter, setActiveTool, spawn, togglePaused, uprightSelected]);
+  }, [clear, newPlayground, redo, rotateSelected, scatter, setActiveTool, spawn, togglePaused, undo, uprightSelected]);
 
   return (
     <main className="relative h-dvh w-full overflow-hidden bg-bg text-fg">
