@@ -17,6 +17,21 @@ export type Weld = {
   bodyB: string;
 };
 
+export type SavedStructure = {
+  version: 1;
+  savedAt: string;
+  bodies: SpawnedBody[];
+  welds: Weld[];
+  gravity: number;
+  restitution: number;
+};
+
+export const STRUCTURE_STORAGE_KEY = "dropyard.structure.v1";
+export const liveBodyPoses = new Map<
+  string,
+  { position: [number, number, number]; rotation: [number, number, number] }
+>();
+
 const MAX_BODIES = 72;
 
 const PALETTES: Record<ShapeKind, string[]> = {
@@ -38,6 +53,61 @@ function pick<T>(list: T[]): T {
 function nextId() {
   seq += 1;
   return `body-${seq}`;
+}
+
+function isTuple(value: unknown, length: number): value is [number, number, number] {
+  return (
+    Array.isArray(value) &&
+    value.length === length &&
+    value.every((entry) => typeof entry === "number" && Number.isFinite(entry))
+  );
+}
+
+function parseSavedStructure(raw: string | null): SavedStructure | null {
+  if (!raw) return null;
+  try {
+    const value = JSON.parse(raw) as Partial<SavedStructure>;
+    if (
+      value.version !== 1 ||
+      !Array.isArray(value.bodies) ||
+      !Array.isArray(value.welds) ||
+      typeof value.gravity !== "number" ||
+      typeof value.restitution !== "number"
+    ) {
+      return null;
+    }
+    const bodies = value.bodies.filter(
+      (body): body is SpawnedBody =>
+        Boolean(body) &&
+        typeof body.id === "string" &&
+        ["sphere", "box", "cylinder"].includes(body.kind) &&
+        isTuple(body.position, 3) &&
+        isTuple(body.rotation, 3) &&
+        isTuple(body.angularVelocity, 3) &&
+        typeof body.color === "string",
+    );
+    const ids = new Set(bodies.map((body) => body.id));
+    const welds = value.welds.filter(
+      (weld): weld is Weld =>
+        Boolean(weld) &&
+        typeof weld.id === "string" &&
+        typeof weld.bodyA === "string" &&
+        typeof weld.bodyB === "string" &&
+        weld.bodyA !== weld.bodyB &&
+        ids.has(weld.bodyA) &&
+        ids.has(weld.bodyB),
+    );
+    return {
+      version: 1,
+      savedAt: typeof value.savedAt === "string" ? value.savedAt : new Date().toISOString(),
+      bodies,
+      welds,
+      gravity: Math.max(0, Math.min(20, value.gravity)),
+      restitution: Math.max(0, Math.min(1, value.restitution)),
+    };
+  } catch {
+    return null;
+  }
 }
 
 export function makeBody(
@@ -90,6 +160,13 @@ type PlaygroundState = {
   weld: (bodyA: string, bodyB: string) => void;
   setWeldMode: (value: boolean) => void;
   setSelectedBodyId: (id: string | null) => void;
+  setBodyPose: (
+    id: string,
+    position: [number, number, number],
+    rotation?: [number, number, number],
+  ) => void;
+  saveStructure: () => boolean;
+  loadStructure: () => boolean;
   setGravity: (value: number) => void;
   setRestitution: (value: number) => void;
   togglePaused: () => void;
@@ -161,6 +238,53 @@ export const usePlayground = create<PlaygroundState>((set) => ({
     }),
   setWeldMode: (value) => set({ weldMode: value, selectedBodyId: null }),
   setSelectedBodyId: (id) => set({ selectedBodyId: id }),
+  setBodyPose: (id, position, rotation) =>
+    set((state) => ({
+      bodies: state.bodies.map((body) =>
+        body.id === id ? { ...body, position, ...(rotation ? { rotation } : {}) } : body,
+      ),
+    })),
+  saveStructure: () => {
+    if (typeof window === "undefined") return false;
+    const state = usePlayground.getState();
+    const snapshot: SavedStructure = {
+      version: 1,
+      savedAt: new Date().toISOString(),
+      bodies: state.bodies.map((body) => {
+        const live = liveBodyPoses.get(body.id);
+        return live ? { ...body, ...live } : body;
+      }),
+      welds: state.welds,
+      gravity: state.gravity,
+      restitution: state.restitution,
+    };
+    try {
+      window.localStorage.setItem(STRUCTURE_STORAGE_KEY, JSON.stringify(snapshot));
+      return true;
+    } catch {
+      return false;
+    }
+  },
+  loadStructure: () => {
+    if (typeof window === "undefined") return false;
+    const saved = parseSavedStructure(window.localStorage.getItem(STRUCTURE_STORAGE_KEY));
+    if (!saved) return false;
+    const maxSequence = saved.bodies.reduce((max, body) => {
+      const match = body.id.match(/^body-(\d+)$/);
+      return Math.max(max, match ? Number(match[1]) : 0);
+    }, 0);
+    seq = Math.max(seq, maxSequence);
+    set({
+      bodies: saved.bodies,
+      welds: saved.welds,
+      gravity: saved.gravity,
+      restitution: saved.restitution,
+      selectedBodyId: null,
+      weldMode: false,
+    });
+    liveBodyPoses.clear();
+    return true;
+  },
   setGravity: (value) => set({ gravity: value }),
   setRestitution: (value) => set({ restitution: value }),
   togglePaused: () => set((state) => ({ paused: !state.paused })),
