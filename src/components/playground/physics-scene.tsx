@@ -245,6 +245,7 @@ function AxisLabel({ axis, color, position }: { axis: "x" | "y" | "z"; color: st
 function RotationGizmo() {
   const { camera, gl, raycaster } = useThree();
   const selectedBodyId = usePlayground((s) => s.selectedBodyId);
+  const interactionMode = usePlayground((s) => s.interactionMode);
   const rotateBody = usePlayground((s) => s.rotateBody);
   const setDragging = usePlayground((s) => s.setDragging);
   const selected = usePlayground((s) => s.bodies.find((body) => body.id === s.selectedBodyId));
@@ -259,7 +260,7 @@ function RotationGizmo() {
   useFrame(() => {
     const group = rotationGizmoGroupRef.current;
     const api = selectedBodyId ? bodyRefs.get(selectedBodyId) : null;
-    if (!group || !api || !api.isValid() || !selected) {
+    if (!group || !api || !api.isValid() || !selected || interactionMode !== "rotate") {
       if (group) group.visible = false;
       return;
     }
@@ -347,7 +348,7 @@ function RotationGizmo() {
       el.removeEventListener("pointerup", onEnd, { capture: true });
       el.removeEventListener("pointercancel", onEnd, { capture: true });
     };
-  }, [gl, raycaster, rotateBody, selected, selectedBodyId, setDragging]);
+  }, [gl, raycaster, rotateBody, selected, selectedBodyId, setDragging, interactionMode]);
 
   return (
     <group ref={rotationGizmoGroupRef} visible={false} renderOrder={20}>
@@ -373,6 +374,8 @@ function GrabController() {
   const demolitionMode = usePlayground((s) => s.demolitionMode);
   const selectedBodyId = usePlayground((s) => s.selectedBodyId);
   const setSelectedBodyId = usePlayground((s) => s.setSelectedBodyId);
+  const interactionMode = usePlayground((s) => s.interactionMode);
+  const setInteractionMode = usePlayground((s) => s.setInteractionMode);
   const activeTool = usePlayground((s) => s.activeTool);
   const weld = usePlayground((s) => s.weld);
   const unweld = usePlayground((s) => s.unweld);
@@ -385,6 +388,7 @@ function GrabController() {
     lastTime: number;
     pointerId: number;
   } | null>(null);
+  const lastTap = useRef<{ id: string; time: number } | null>(null);
 
   useEffect(() => {
     const el = gl.domElement;
@@ -431,7 +435,7 @@ function GrabController() {
       }
       const picked = pickDynamic();
       if (!picked || !picked.body.isValid()) {
-        if (activeTool === "select" || activeTool === "scale") setSelectedBodyId(null);
+        if ((activeTool === "select" || activeTool === "scale") && interactionMode === "move") setSelectedBodyId(null);
         return;
       }
 
@@ -478,7 +482,17 @@ function GrabController() {
       }
 
       const pickedId = bodyIdFor(picked.body);
-      if (pickedId) setSelectedBodyId(pickedId);
+      if (pickedId) {
+        const now = performance.now();
+        const isDoubleTap = lastTap.current?.id === pickedId && now - lastTap.current.time < 360;
+        lastTap.current = { id: pickedId, time: now };
+        if (activeTool === "select" && isDoubleTap && selectedBodyId === pickedId) {
+          setInteractionMode(interactionMode === "rotate" ? "move" : "rotate");
+        } else {
+          setInteractionMode("move");
+          setSelectedBodyId(pickedId);
+        }
+      }
       const pickedState = usePlayground.getState().bodies.find((body) => body.id === pickedId);
       if (pickedState?.locked) return;
       picked.body.wakeUp();
@@ -563,6 +577,8 @@ function GrabController() {
     raycaster,
     selectedBodyId,
     activeTool,
+    interactionMode,
+    setInteractionMode,
     setDragging,
     setSelectedBodyId,
     weld,

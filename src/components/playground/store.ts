@@ -36,6 +36,7 @@ export type NamedPlayground = SavedStructure & { name: string };
 
 export type PresetKind = "wall" | "floor" | "pillar" | "room" | "bridge";
 export type ConstructionTool = "none" | "spawn" | "select" | "weld" | "demolish" | "scale";
+export type InteractionMode = "move" | "rotate";
 
 export const STRUCTURE_STORAGE_KEY = "dropyard.structure.v1";
 export const PLAYGROUNDS_STORAGE_KEY = "dropyard.playgrounds.v1";
@@ -200,6 +201,7 @@ type PlaygroundState = {
   demolitionMode: boolean;
   activeTool: ConstructionTool;
   selectedBodyId: string | null;
+  interactionMode: InteractionMode;
   spawnCount: number;
   savedPlaygrounds: NamedPlayground[];
   snapEnabled: boolean;
@@ -224,6 +226,7 @@ type PlaygroundState = {
   setDemolitionMode: (value: boolean) => void;
   setActiveTool: (tool: ConstructionTool) => void;
   setSelectedBodyId: (id: string | null) => void;
+  setInteractionMode: (mode: InteractionMode) => void;
   setSelectedMaterial: (material: MaterialKind) => void;
   toggleSelectedLock: () => void;
   setSpawnCount: (count: number) => void;
@@ -263,6 +266,7 @@ export const usePlayground = create<PlaygroundState>((set) => ({
   demolitionMode: false,
   activeTool: "spawn",
   selectedBodyId: null,
+  interactionMode: "move",
   spawnCount: 1,
   savedPlaygrounds: [],
   snapEnabled: true,
@@ -374,9 +378,11 @@ export const usePlayground = create<PlaygroundState>((set) => ({
       activeTool: tool,
       weldMode: tool === "weld",
       demolitionMode: tool === "demolish",
+      interactionMode: "move",
       selectedBodyId: tool === "spawn" || tool === "demolish" ? null : state.selectedBodyId,
     })),
   setSelectedBodyId: (id) => set({ selectedBodyId: id }),
+  setInteractionMode: (mode) => set({ interactionMode: mode }),
   setSelectedMaterial: (material) =>
     set((state) => ({
       bodies: state.bodies.map((body) =>
