@@ -117,6 +117,7 @@ function ShapeBody({ body, selected }: { body: SpawnedBody; selected: boolean })
         {body.kind === "box" && <boxGeometry args={[0.84, 0.84, 0.84]} />}
         {body.kind === "cylinder" && <cylinderGeometry args={[0.38, 0.38, 1, 28]} />}
       </mesh>
+      {selected && <gridHelper args={[1.8, 8, "#f4cf72", "#6d5e2c"]} position={[0, -0.52, 0]} />}
     </RigidBody>
   );
 }
