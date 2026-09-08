@@ -1,4 +1,16 @@
-import { Circle, Cuboid, Cylinder, Link2, Pause, Play, Shuffle, Trash2 } from "lucide-react";
+import {
+  Circle,
+  Cuboid,
+  Cylinder,
+  FolderOpen,
+  Link2,
+  Pause,
+  Play,
+  Save,
+  Shuffle,
+  Trash2,
+} from "lucide-react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { cn } from "@/lib/utils";
@@ -24,6 +36,21 @@ export function Toolbar() {
   const weldMode = usePlayground((s) => s.weldMode);
   const selectedBodyId = usePlayground((s) => s.selectedBodyId);
   const setWeldMode = usePlayground((s) => s.setWeldMode);
+  const saveStructure = usePlayground((s) => s.saveStructure);
+  const loadStructure = usePlayground((s) => s.loadStructure);
+  const [status, setStatus] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (loadStructure()) setStatus("Loaded saved structure");
+  }, [loadStructure]);
+
+  const handleSave = () => {
+    setStatus(saveStructure() ? "Structure saved on this device" : "Could not save structure");
+  };
+
+  const handleLoad = () => {
+    setStatus(loadStructure() ? "Structure loaded" : "No saved structure found");
+  };
 
   return (
     <div className="pointer-events-none absolute inset-0 flex flex-col justify-between p-3 pt-[max(0.75rem,env(safe-area-inset-top))] pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:p-5">
@@ -94,6 +121,14 @@ export function Toolbar() {
             >
               <Trash2 className="size-4" strokeWidth={1.75} />
               <span>Clear</span>
+              </Button>
+            <Button variant="muted" onClick={handleSave} aria-label="Save structure">
+              <Save className="size-4" strokeWidth={1.75} />
+              <span>Save</span>
+            </Button>
+            <Button variant="muted" onClick={handleLoad} aria-label="Load saved structure">
+              <FolderOpen className="size-4" strokeWidth={1.75} />
+              <span>Load</span>
             </Button>
           </div>
 
@@ -124,6 +159,7 @@ export function Toolbar() {
                 : "Click one body, then another nearby body to weld them together."}
             </p>
           )}
+          {status && <p className="text-xs text-muted" role="status">{status}</p>}
         </div>
       </div>
     </div>

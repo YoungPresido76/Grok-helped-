@@ -9,9 +9,9 @@ import {
   type RapierRigidBody,
 } from "@react-three/rapier";
 import { useEffect, useMemo, useRef } from "react";
-import { Color, MeshStandardMaterial, Plane, Quaternion, Vector2, Vector3 } from "three";
+import { Color, Euler, MeshStandardMaterial, Plane, Quaternion, Vector2, Vector3 } from "three";
 import { orbitControlsRef } from "./orbit-controls";
-import { usePlayground, type ShapeKind, type SpawnedBody } from "./store";
+import { liveBodyPoses, usePlayground, type ShapeKind, type SpawnedBody } from "./store";
 
 const GRAB_Y_MIN = 0.55;
 const ARENA_RADIUS = 14;
@@ -400,7 +400,16 @@ function BodyCuller() {
     for (const body of bodies) {
       const rb = bodyRefs.get(body.id);
       if (!rb || !rb.isValid()) continue;
-      if (rb.translation().y < FALL_KILL) remove(body.id);
+      const position = rb.translation();
+      const rotation = rb.rotation();
+      const euler = new Euler().setFromQuaternion(
+        new Quaternion(rotation.x, rotation.y, rotation.z, rotation.w),
+      );
+      liveBodyPoses.set(body.id, {
+        position: [position.x, position.y, position.z],
+        rotation: [euler.x, euler.y, euler.z],
+      });
+      if (position.y < FALL_KILL) remove(body.id);
     }
   });
 
