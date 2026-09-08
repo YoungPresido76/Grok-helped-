@@ -4,8 +4,10 @@ import {
   Cylinder,
   FolderOpen,
   Link2,
+  Maximize2,
   Pause,
   Play,
+  RotateCw,
   Save,
   Shuffle,
   Trash2,
@@ -14,7 +16,7 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { cn } from "@/lib/utils";
-import { usePlayground, type ShapeKind } from "./store";
+import { usePlayground, type PresetKind, type ShapeKind } from "./store";
 
 const SHAPES: { kind: ShapeKind; label: string; icon: typeof Circle }[] = [
   { kind: "sphere", label: "Sphere", icon: Circle },
@@ -38,6 +40,9 @@ export function Toolbar() {
   const setWeldMode = usePlayground((s) => s.setWeldMode);
   const saveStructure = usePlayground((s) => s.saveStructure);
   const loadStructure = usePlayground((s) => s.loadStructure);
+  const transformSelected = usePlayground((s) => s.transformSelected);
+  const spawnPreset = usePlayground((s) => s.spawnPreset);
+  const selected = usePlayground((s) => s.selectedBodyId !== null);
   const [status, setStatus] = useState<string | null>(null);
 
   useEffect(() => {
@@ -160,6 +165,41 @@ export function Toolbar() {
             </p>
           )}
           {status && <p className="text-xs text-muted" role="status">{status}</p>}
+          <div className="flex flex-wrap items-center gap-2 border-t border-border pt-3">
+            <span className="mr-1 text-xs font-medium text-muted">Piece tools</span>
+            <Button
+              variant="muted"
+              disabled={!selected}
+              onClick={() => transformSelected(Math.PI / 12, 1)}
+              aria-label="Rotate selected piece clockwise"
+            >
+              <RotateCw className="size-4" strokeWidth={1.75} />
+              <span>Rotate</span>
+            </Button>
+            <Button
+              variant="muted"
+              disabled={!selected}
+              onClick={() => transformSelected(0, 1.15)}
+              aria-label="Scale selected piece up"
+            >
+              <Maximize2 className="size-4" strokeWidth={1.75} />
+              <span>Grow</span>
+            </Button>
+            <Button
+              variant="muted"
+              disabled={!selected}
+              onClick={() => transformSelected(0, 0.87)}
+              aria-label="Scale selected piece down"
+            >
+              <Maximize2 className="size-4 rotate-180" strokeWidth={1.75} />
+              <span>Shrink</span>
+            </Button>
+            {(["wall", "floor", "pillar"] as PresetKind[]).map((preset) => (
+              <Button key={preset} variant="ghost" onClick={() => spawnPreset(preset)}>
+                <span>{preset[0].toUpperCase() + preset.slice(1)}</span>
+              </Button>
+            ))}
+          </div>
         </div>
       </div>
     </div>
