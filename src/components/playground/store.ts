@@ -28,6 +28,7 @@ export type SavedStructure = {
 };
 
 export type PresetKind = "wall" | "floor" | "pillar";
+export type ConstructionTool = "spawn" | "weld" | "demolish" | "scale";
 
 export const STRUCTURE_STORAGE_KEY = "dropyard.structure.v1";
 export const liveBodyPoses = new Map<
@@ -163,6 +164,7 @@ type PlaygroundState = {
   dragging: boolean;
   weldMode: boolean;
   demolitionMode: boolean;
+  activeTool: ConstructionTool;
   selectedBodyId: string | null;
   spawn: (kind: ShapeKind, position?: [number, number, number]) => void;
   scatter: () => void;
@@ -172,6 +174,7 @@ type PlaygroundState = {
   unweld: (bodyA: string, bodyB: string) => void;
   setWeldMode: (value: boolean) => void;
   setDemolitionMode: (value: boolean) => void;
+  setActiveTool: (tool: ConstructionTool) => void;
   setSelectedBodyId: (id: string | null) => void;
   setBodyPose: (
     id: string,
@@ -199,6 +202,7 @@ export const usePlayground = create<PlaygroundState>((set) => ({
   dragging: false,
   weldMode: false,
   demolitionMode: false,
+  activeTool: "spawn",
   selectedBodyId: null,
   spawn: (kind, position) =>
     set((state) => {
@@ -263,9 +267,17 @@ export const usePlayground = create<PlaygroundState>((set) => ({
       ),
       selectedBodyId: null,
     })),
-  setWeldMode: (value) => set({ weldMode: value, demolitionMode: false, selectedBodyId: null }),
+  setWeldMode: (value) =>
+    set({ weldMode: value, demolitionMode: false, activeTool: value ? "weld" : "spawn", selectedBodyId: null }),
   setDemolitionMode: (value) =>
-    set({ demolitionMode: value, weldMode: false, selectedBodyId: null }),
+    set({ demolitionMode: value, weldMode: false, activeTool: value ? "demolish" : "spawn", selectedBodyId: null }),
+  setActiveTool: (tool) =>
+    set({
+      activeTool: tool,
+      weldMode: tool === "weld",
+      demolitionMode: tool === "demolish",
+      selectedBodyId: null,
+    }),
   setSelectedBodyId: (id) => set({ selectedBodyId: id }),
   setBodyPose: (id, position, rotation) =>
     set((state) => ({
@@ -358,6 +370,8 @@ export const usePlayground = create<PlaygroundState>((set) => ({
       restitution: saved.restitution,
       selectedBodyId: null,
       weldMode: false,
+      demolitionMode: false,
+      activeTool: "spawn",
     });
     liveBodyPoses.clear();
     return true;

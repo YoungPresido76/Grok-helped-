@@ -3,6 +3,7 @@ import {
   Cuboid,
   Cylinder,
   FolderOpen,
+  Hammer,
   Link2,
   Maximize2,
   Unlink2,
@@ -18,6 +19,13 @@ import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { cn } from "@/lib/utils";
 import { usePlayground, type PresetKind, type ShapeKind } from "./store";
+
+const TOOLS = [
+  { id: "spawn", label: "Spawn", icon: Hammer, hint: "Add pieces and presets" },
+  { id: "weld", label: "Weld", icon: Link2, hint: "Join nearby pieces" },
+  { id: "demolish", label: "Demolish", icon: Unlink2, hint: "Break a connection" },
+  { id: "scale", label: "Scale", icon: Maximize2, hint: "Select and resize" },
+] as const;
 
 const SHAPES: { kind: ShapeKind; label: string; icon: typeof Circle }[] = [
   { kind: "sphere", label: "Sphere", icon: Circle },
@@ -39,8 +47,8 @@ export function Toolbar() {
   const weldMode = usePlayground((s) => s.weldMode);
   const demolitionMode = usePlayground((s) => s.demolitionMode);
   const selectedBodyId = usePlayground((s) => s.selectedBodyId);
-  const setWeldMode = usePlayground((s) => s.setWeldMode);
-  const setDemolitionMode = usePlayground((s) => s.setDemolitionMode);
+  const activeTool = usePlayground((s) => s.activeTool);
+  const setActiveTool = usePlayground((s) => s.setActiveTool);
   const saveStructure = usePlayground((s) => s.saveStructure);
   const loadStructure = usePlayground((s) => s.loadStructure);
   const transformSelected = usePlayground((s) => s.transformSelected);
@@ -96,7 +104,29 @@ export function Toolbar() {
           )}
         >
           <div className="flex flex-wrap items-center gap-2">
-            {SHAPES.map(({ kind, label, icon: Icon }) => (
+            <div className="w-full rounded-sm border border-border bg-surface-2 p-1">
+              <div className="grid grid-cols-2 gap-1 sm:grid-cols-4">
+                {TOOLS.map(({ id, label, icon: Icon, hint }) => (
+                  <button
+                    key={id}
+                    type="button"
+                    className={cn(
+                      "flex min-h-11 items-center justify-center gap-2 rounded-sm px-2 py-2 text-xs font-semibold transition-colors",
+                      activeTool === id
+                        ? "bg-accent text-accent-fg"
+                        : "text-muted hover:bg-border hover:text-fg",
+                    )}
+                    onClick={() => setActiveTool(id)}
+                    aria-pressed={activeTool === id}
+                    title={hint}
+                  >
+                    <Icon className="size-4" strokeWidth={1.75} />
+                    <span>{label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+            {activeTool === "spawn" && SHAPES.map(({ kind, label, icon: Icon }) => (
               <Button
                 key={kind}
                 variant="muted"
@@ -107,30 +137,10 @@ export function Toolbar() {
                 <span>{label}</span>
               </Button>
             ))}
-            <Button variant="muted" onClick={scatter} aria-label="Scatter mixed shapes">
+            {activeTool === "spawn" && <Button variant="muted" onClick={scatter} aria-label="Scatter mixed shapes">
               <Shuffle className="size-4" strokeWidth={1.75} />
               <span>Scatter</span>
-            </Button>
-            <Button
-              variant={weldMode ? "solid" : "muted"}
-              onClick={() => setWeldMode(!weldMode)}
-              aria-pressed={weldMode}
-              aria-label={weldMode ? "Exit weld mode" : "Enter weld mode"}
-              title="Select two nearby bodies to weld them together"
-            >
-              <Link2 className="size-4" strokeWidth={1.75} />
-              <span>{weldMode ? "Welding…" : "Weld"}</span>
-            </Button>
-            <Button
-              variant={demolitionMode ? "solid" : "muted"}
-              onClick={() => setDemolitionMode(!demolitionMode)}
-              aria-pressed={demolitionMode}
-              aria-label={demolitionMode ? "Exit demolition mode" : "Enter demolition mode"}
-              title="Select two connected bodies to break their weld"
-            >
-              <Unlink2 className="size-4" strokeWidth={1.75} />
-              <span>{demolitionMode ? "Demolishing…" : "Demolish"}</span>
-            </Button>
+            </Button>}
             <Button
               variant="ghost"
               onClick={clear}
