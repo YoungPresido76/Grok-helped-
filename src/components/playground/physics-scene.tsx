@@ -138,6 +138,7 @@ function ShapeBody({ body, selected }: { body: SpawnedBody; selected: boolean })
           {body.kind === "arc" && <torusGeometry args={[0.36, 0.14, 8, 20, Math.PI]} />}
           {body.kind === "semicircle" && <sphereGeometry args={[0.5, 32, 12, 0, Math.PI * 2, 0, Math.PI / 2]} />}
         </mesh>
+        {body.kind === "semicircle" && <mesh castShadow receiveShadow material={material} position={[0, -0.02, 0]}><cylinderGeometry args={[0.5, 0.5, 0.08, 32]} /></mesh>}
         {selected && <gridHelper args={[1.8, 8, "#f4cf72", "#6d5e2c"]} position={[0, -0.52, 0]} />}
       </group>
     </RigidBody>

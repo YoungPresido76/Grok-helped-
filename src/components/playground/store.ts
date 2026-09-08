@@ -87,6 +87,21 @@ function pick<T>(list: T[]): T {
   return list[Math.floor(Math.random() * list.length)] as T;
 }
 
+function groupMembers(state: PlaygroundState, selectedId: string | null) {
+  const selected = state.bodies.find((body) => body.id === selectedId);
+  return selected?.groupId ? state.bodies.filter((body) => body.groupId === selected.groupId) : selected ? [selected] : [];
+}
+
+function rotatePoint(point: [number, number, number], pivot: [number, number, number], axis: "x" | "y" | "z", angle: number): [number, number, number] {
+  const x = point[0] - pivot[0];
+  const y = point[1] - pivot[1];
+  const z = point[2] - pivot[2];
+  const c = Math.cos(angle);
+  const s = Math.sin(angle);
+  const rotated = axis === "x" ? [x, y * c - z * s, y * s + z * c] : axis === "y" ? [x * c + z * s, y, -x * s + z * c] : [x * c - y * s, x * s + y * c, z];
+  return [rotated[0] + pivot[0], rotated[1] + pivot[1], rotated[2] + pivot[2]];
+}
+
 function nextId() {
   seq += 1;
   return `body-${seq}`;
@@ -441,24 +456,26 @@ export const usePlayground = create<PlaygroundState>((set) => ({
     })),
   transformSelected: (rotationDelta, scaleFactor) =>
     set((state) => ({
-      bodies: state.bodies.map((body) =>
-        body.id === state.selectedBodyId || (state.bodies.find((entry) => entry.id === state.selectedBodyId)?.groupId && body.groupId === state.bodies.find((entry) => entry.id === state.selectedBodyId)?.groupId)
-          ? {
+      bodies: state.bodies.map((body) => {
+        const members = groupMembers(state, state.selectedBodyId);
+        if (!members.some((member) => member.id === body.id)) return body;
+        const pivot = members.reduce((sum, member) => [sum[0] + member.position[0], sum[1] + member.position[1], sum[2] + member.position[2]] as [number, number, number], [0, 0, 0]).map((value) => value / members.length) as [number, number, number];
+        return {
               ...body,
+              position: rotatePoint(body.position, pivot, "y", rotationDelta),
               rotation: [body.rotation[0], body.rotation[1] + rotationDelta, body.rotation[2]],
               scale: body.scale.map((value) => Math.max(0.25, Math.min(4, value * scaleFactor))) as [
                 number,
                 number,
                 number,
               ],
-            }
-          : body,
-      ),
+            };
+      }),
     })),
   moveSelected: (axis, distance) =>
     set((state) => ({
       bodies: state.bodies.map((body) => {
-        if (body.id !== state.selectedBodyId) return body;
+        if (!groupMembers(state, state.selectedBodyId).some((member) => member.id === body.id)) return body;
         const position = [...(liveBodyPoses.get(body.id)?.position ?? body.position)] as [number, number, number];
         const index = axis === "x" ? 0 : axis === "y" ? 1 : 2;
         position[index] += distance;
@@ -470,21 +487,27 @@ export const usePlayground = create<PlaygroundState>((set) => ({
   rotateSelected: (axis, degrees) =>
     set((state) => ({
       bodies: state.bodies.map((body) => {
-        if (body.id !== state.selectedBodyId) return body;
+        const members = groupMembers(state, state.selectedBodyId);
+        if (!members.some((member) => member.id === body.id)) return body;
         const rotation = [...body.rotation] as [number, number, number];
         const index = axis === "x" ? 0 : axis === "y" ? 1 : 2;
-        rotation[index] += (degrees * Math.PI) / 180;
-        return { ...body, rotation };
+        const angle = (degrees * Math.PI) / 180;
+        rotation[index] += angle;
+        const pivot = members.reduce((sum, member) => [sum[0] + member.position[0], sum[1] + member.position[1], sum[2] + member.position[2]] as [number, number, number], [0, 0, 0]).map((value) => value / members.length) as [number, number, number];
+        return { ...body, position: rotatePoint(body.position, pivot, axis, angle), rotation };
       }),
     })),
   rotateBody: (id, axis, degrees) =>
     set((state) => ({
       bodies: state.bodies.map((body) => {
-        if (body.id !== id) return body;
+        const members = groupMembers(state, id);
+        if (!members.some((member) => member.id === body.id)) return body;
         const rotation = [...body.rotation] as [number, number, number];
         const index = axis === "x" ? 0 : axis === "y" ? 1 : 2;
-        rotation[index] += (degrees * Math.PI) / 180;
-        return { ...body, rotation };
+        const angle = (degrees * Math.PI) / 180;
+        rotation[index] += angle;
+        const pivot = members.reduce((sum, member) => [sum[0] + member.position[0], sum[1] + member.position[1], sum[2] + member.position[2]] as [number, number, number], [0, 0, 0]).map((value) => value / members.length) as [number, number, number];
+        return { ...body, position: rotatePoint(body.position, pivot, axis, angle), rotation };
       }),
     })),
   uprightSelected: () =>
