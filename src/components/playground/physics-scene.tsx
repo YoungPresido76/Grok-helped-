@@ -9,7 +9,7 @@ import {
   type RapierRigidBody,
 } from "@react-three/rapier";
 import { useEffect, useMemo, useRef } from "react";
-import { Color, MeshStandardMaterial, Plane, Vector2, Vector3 } from "three";
+import { Color, MeshStandardMaterial, Plane, Quaternion, Vector2, Vector3 } from "three";
 import { orbitControlsRef } from "./orbit-controls";
 import { usePlayground, type ShapeKind, type SpawnedBody } from "./store";
 
@@ -29,6 +29,13 @@ const rayOrigin = { x: 0, y: 0, z: 0 };
 const rayDir = { x: 0, y: 0, z: 1 };
 
 const bodyRefs = new Map<string, RapierRigidBody>();
+
+function bodyIdFor(api: RapierRigidBody) {
+  for (const [id, body] of bodyRefs) {
+    if (body === api) return id;
+  }
+  return null;
+}
 
 function PhysicsArena() {
   const restitution = usePlayground((s) => s.restitution);
@@ -117,6 +124,54 @@ function Bodies() {
   );
 }
 
+function WeldJoints() {
+  const welds = usePlayground((s) => s.welds);
+  const { rapier, world } = useRapier();
+
+  useEffect(() => {
+    const joints: Array<ReturnType<typeof world.createImpulseJoint>> = [];
+    for (const weld of welds) {
+      const bodyA = bodyRefs.get(weld.bodyA);
+      const bodyB = bodyRefs.get(weld.bodyB);
+      if (!bodyA || !bodyB || !bodyA.isValid() || !bodyB.isValid()) continue;
+
+      const translationA = bodyA.translation();
+      const translationB = bodyB.translation();
+      const worldAnchor = new Vector3(
+        (translationA.x + translationB.x) / 2,
+        (translationA.y + translationB.y) / 2,
+        (translationA.z + translationB.z) / 2,
+      );
+      const localAnchor = (body: RapierRigidBody) => {
+        const translation = body.translation();
+        const rotation = body.rotation();
+        const inverse = new Quaternion(rotation.x, rotation.y, rotation.z, rotation.w).invert();
+        return new Vector3(worldAnchor.x - translation.x, worldAnchor.y - translation.y, worldAnchor.z - translation.z)
+          .applyQuaternion(inverse);
+      };
+      const frame = (body: RapierRigidBody) => {
+        const rotation = body.rotation();
+        const inverse = new Quaternion(rotation.x, rotation.y, rotation.z, rotation.w).invert();
+        return { x: inverse.x, y: inverse.y, z: inverse.z, w: inverse.w };
+      };
+      const localA = localAnchor(bodyA);
+      const localB = localAnchor(bodyB);
+      const data = rapier.JointData.fixed(
+        { x: localA.x, y: localA.y, z: localA.z },
+        frame(bodyA),
+        { x: localB.x, y: localB.y, z: localB.z },
+        frame(bodyB),
+      );
+      joints.push(world.createImpulseJoint(data, bodyA, bodyB, true));
+    }
+    return () => {
+      for (const joint of joints) world.removeImpulseJoint(joint, true);
+    };
+  }, [rapier, welds, world]);
+
+  return null;
+}
+
 function setNdc(event: PointerEvent, el: HTMLCanvasElement) {
   const rect = el.getBoundingClientRect();
   pointerNdc.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
@@ -128,6 +183,10 @@ function GrabController() {
   const { world, rapier } = useRapier();
   const setDragging = usePlayground((s) => s.setDragging);
   const paused = usePlayground((s) => s.paused);
+  const weldMode = usePlayground((s) => s.weldMode);
+  const selectedBodyId = usePlayground((s) => s.selectedBodyId);
+  const setSelectedBodyId = usePlayground((s) => s.setSelectedBodyId);
+  const weld = usePlayground((s) => s.weld);
   const grab = useRef<{
     body: RapierRigidBody;
     offset: Vector3;
@@ -182,6 +241,40 @@ function GrabController() {
 
       event.stopImmediatePropagation();
       event.preventDefault();
+
+      if (weldMode) {
+        const pickedId = bodyIdFor(picked.body);
+        if (!pickedId) return;
+        if (!selectedBodyId || selectedBodyId === pickedId) {
+          setSelectedBodyId(pickedId);
+          return;
+        }
+        const first = bodyRefs.get(selectedBodyId);
+        if (!first || !first.isValid()) {
+          setSelectedBodyId(pickedId);
+          return;
+        }
+        const firstPosition = first.translation();
+        const secondPosition = picked.body.translation();
+        const offset = new Vector3(
+          secondPosition.x - firstPosition.x,
+          secondPosition.y - firstPosition.y,
+          secondPosition.z - firstPosition.z,
+        );
+        if (offset.length() > 2.4) {
+          setSelectedBodyId(pickedId);
+          return;
+        }
+        const direction = offset.lengthSq() > 0.0001 ? offset.normalize() : new Vector3(1, 0, 0);
+        const snapped = new Vector3(firstPosition.x, firstPosition.y, firstPosition.z).add(
+          direction.multiplyScalar(0.9),
+        );
+        picked.body.setTranslation({ x: snapped.x, y: snapped.y, z: snapped.z }, true);
+        picked.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
+        picked.body.setAngvel({ x: 0, y: 0, z: 0 }, true);
+        weld(selectedBodyId, pickedId);
+        return;
+      }
 
       picked.body.wakeUp();
       picked.body.setBodyType(rapier.RigidBodyType.KinematicPositionBased, true);
@@ -252,7 +345,18 @@ function GrabController() {
       el.removeEventListener("pointercancel", onEnd);
       el.removeEventListener("contextmenu", preventMenu);
     };
-  }, [camera, gl, rapier, raycaster, setDragging, world]);
+  }, [
+    camera,
+    gl,
+    rapier,
+    raycaster,
+    selectedBodyId,
+    setDragging,
+    setSelectedBodyId,
+    weld,
+    weldMode,
+    world,
+  ]);
 
   useFrame(() => {
     const active = grab.current;
@@ -319,6 +423,7 @@ export default function PhysicsScene() {
     >
       <PhysicsArena />
       <Bodies />
+      <WeldJoints />
       <GrabController />
       <BodyCuller />
     </Physics>
