@@ -120,6 +120,7 @@ function ShapeBody({ body, selected }: { body: SpawnedBody; selected: boolean })
       canSleep
     >
       {body.kind === "sphere" && <BallCollider args={[0.46]} density={materialProfile.density} sensor={selected} />}
+      {body.kind === "circle" && <CylinderCollider args={[0.5, 0.08]} density={materialProfile.density} sensor={selected} />}
       {body.kind === "box" && <CuboidCollider args={[0.42, 0.42, 0.42]} density={materialProfile.density} sensor={selected} />}
       {(body.kind === "cylinder" || body.kind === "cone" || body.kind === "triangle") && <CylinderCollider args={[0.5, 0.38]} density={materialProfile.density} sensor={selected} />}
       {(body.kind === "torus" || body.kind === "capsule" || body.kind === "arc" || body.kind === "semicircle") && <BallCollider args={[0.5]} density={materialProfile.density} sensor={selected} />}
@@ -127,6 +128,7 @@ function ShapeBody({ body, selected }: { body: SpawnedBody; selected: boolean })
       <group visible={body.visible}>
         <mesh castShadow receiveShadow material={material}>
           {body.kind === "sphere" && <sphereGeometry args={[0.46, 32, 24]} />}
+          {body.kind === "circle" && <cylinderGeometry args={[0.5, 0.5, 0.12, 48]} />}
           {body.kind === "box" && <boxGeometry args={[0.84, 0.84, 0.84]} />}
           {body.kind === "cylinder" && <cylinderGeometry args={[0.38, 0.38, 1, 28]} />}
           {body.kind === "cone" && <coneGeometry args={[0.48, 1, 28]} />}

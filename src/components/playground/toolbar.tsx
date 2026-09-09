@@ -53,6 +53,7 @@ const TOOLS: { id: ConstructionTool; label: string; icon: typeof Hammer; hint: s
 
 const SHAPES: { kind: ShapeKind; label: string; icon: typeof Circle }[] = [
   { kind: "sphere", label: "Sphere", icon: Circle },
+  { kind: "circle", label: "Circle", icon: Circle },
   { kind: "box", label: "Box", icon: Cuboid },
   { kind: "cylinder", label: "Cylinder", icon: Cylinder },
   { kind: "cone", label: "Cone", icon: Triangle },

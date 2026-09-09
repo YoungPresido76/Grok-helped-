@@ -1,6 +1,6 @@
 import { create } from "zustand";
 
-export type ShapeKind = "sphere" | "box" | "cylinder" | "cone" | "torus" | "capsule" | "triangle" | "trapezium" | "plateau" | "arc" | "semicircle";
+export type ShapeKind = "sphere" | "circle" | "box" | "cylinder" | "cone" | "torus" | "capsule" | "triangle" | "trapezium" | "plateau" | "arc" | "semicircle";
 export type MaterialKind = "wood" | "steel" | "glass";
 
 export type SpawnedBody = {
@@ -59,6 +59,7 @@ function withHistory(state: PlaygroundState, next: Partial<PlaygroundState>): Pa
 
 const PALETTES: Record<ShapeKind, string[]> = {
   sphere: ["#c56a4a", "#d07a58", "#b85c40", "#a8523a"],
+  circle: ["#d08a55", "#df9b65", "#bd7544", "#aa663b"],
   box: ["#3d6b6a", "#4a7c74", "#355e62", "#2f5850"],
   cylinder: ["#bba57e", "#c9b48a", "#a8946c", "#9a8662"],
   cone: ["#b26c45", "#c17a4f", "#9d5c3b", "#8d5037"],
@@ -132,7 +133,7 @@ function parseSavedStructure(raw: string | null): SavedStructure | null {
       (body): body is SpawnedBody =>
         Boolean(body) &&
         typeof body.id === "string" &&
-        ["sphere", "box", "cylinder", "cone", "torus", "capsule", "triangle", "trapezium", "plateau", "arc", "semicircle"].includes(body.kind) &&
+        ["sphere", "circle", "box", "cylinder", "cone", "torus", "capsule", "triangle", "trapezium", "plateau", "arc", "semicircle"].includes(body.kind) &&
         isTuple(body.position, 3) &&
         isTuple(body.rotation, 3) &&
         isTuple(body.angularVelocity, 3) &&
