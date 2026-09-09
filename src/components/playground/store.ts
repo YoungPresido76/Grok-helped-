@@ -103,6 +103,11 @@ function rotatePoint(point: [number, number, number], pivot: [number, number, nu
   return [rotated[0] + pivot[0], rotated[1] + pivot[1], rotated[2] + pivot[2]];
 }
 
+function weldRadius(body: SpawnedBody) {
+  const base = body.kind === "circle" ? 0.52 : body.kind === "cylinder" ? 0.55 : body.kind === "box" ? 0.6 : body.kind === "cone" || body.kind === "triangle" ? 0.62 : body.kind === "trapezium" || body.kind === "plateau" ? 0.68 : 0.56;
+  return base * Math.max(...body.scale);
+}
+
 function nextId() {
   seq += 1;
   return `body-${seq}`;
@@ -404,7 +409,22 @@ export const usePlayground = create<PlaygroundState>((set) => ({
           (weld.bodyA === bodyB && weld.bodyB === bodyA),
       );
       if (exists) return { selectedBodyId: null };
+      const first = state.bodies.find((body) => body.id === bodyA);
+      const second = state.bodies.find((body) => body.id === bodyB);
+      if (!first || !second) return { selectedBodyId: null };
+      const dx = second.position[0] - first.position[0];
+      const dy = second.position[1] - first.position[1];
+      const dz = second.position[2] - first.position[2];
+      const distance = Math.hypot(dx, dy, dz);
+      const direction: [number, number, number] = distance > 0.001 ? [dx / distance, dy / distance, dz / distance] : [0, 1, 0];
+      const contactDistance = weldRadius(first) + weldRadius(second);
+      const snappedPosition: [number, number, number] = [
+        first.position[0] + direction[0] * contactDistance,
+        Math.max(0.5, first.position[1] + direction[1] * contactDistance),
+        first.position[2] + direction[2] * contactDistance,
+      ];
       return {
+        bodies: state.bodies.map((body) => body.id === second.id ? { ...body, position: snappedPosition } : body),
         welds: [...state.welds, { id: `weld-${bodyA}-${bodyB}`, bodyA, bodyB }],
         selectedBodyId: null,
       };
