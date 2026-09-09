@@ -54,8 +54,8 @@ const TOOLS: { id: ConstructionTool; label: string; icon: typeof Hammer; hint: s
 const SHAPES: { kind: ShapeKind; label: string; icon: typeof Circle }[] = [
   { kind: "sphere", label: "Sphere", icon: Circle },
   { kind: "circle", label: "Circle", icon: Circle },
-  { kind: "box", label: "Box", icon: Cuboid },
   { kind: "cylinder", label: "Cylinder", icon: Cylinder },
+  { kind: "box", label: "Box", icon: Cuboid },
   { kind: "cone", label: "Cone", icon: Triangle },
   { kind: "torus", label: "Torus", icon: CircleDot },
   { kind: "capsule", label: "Capsule", icon: Cylinder },
@@ -77,6 +77,7 @@ export function Toolbar() {
   const paused = usePlayground((s) => s.paused);
   const togglePaused = usePlayground((s) => s.togglePaused);
   const count = usePlayground((s) => s.bodies.length);
+  const bodies = usePlayground((s) => s.bodies);
   const newPlayground = usePlayground((s) => s.newPlayground);
   const renameBody = usePlayground((s) => s.renameBody);
   const undo = usePlayground((s) => s.undo);
@@ -177,6 +178,11 @@ export function Toolbar() {
           <div className="mb-3 border-b border-border pb-3">
             <p className="mb-2 text-xs font-semibold uppercase tracking-[0.14em] text-subtle">Saved playgrounds</p>
             {savedPlaygrounds.length === 0 ? <p className="text-xs text-muted">No named playgrounds yet.</p> : <div className="space-y-1">{savedPlaygrounds.slice().reverse().map((entry) => <div key={entry.name} className="flex items-center gap-2 rounded-sm bg-surface-2 px-2 py-1.5"><button type="button" className="min-w-0 flex-1 truncate text-left text-xs font-semibold text-fg hover:text-accent" onClick={() => setStatus(loadNamed(entry.name) ? `Loaded “${entry.name}”` : "Could not load playground")}>{entry.name}</button><button type="button" className="rounded-sm p-1 text-muted hover:bg-border hover:text-danger" onClick={() => deleteNamed(entry.name)} aria-label={`Delete saved playground ${entry.name}`}><Trash2 className="size-3.5" /></button></div>)}</div>}
+          </div>
+
+          <div className="mb-3 border-b border-border pb-3">
+            <div className="mb-2 flex items-center justify-between"><p className="text-xs font-semibold uppercase tracking-[0.14em] text-subtle">Objects in playground</p><span className="text-[11px] tabular-nums text-muted">{count}</span></div>
+            {count === 0 ? <p className="text-xs text-muted">No objects yet. Spawn one below.</p> : <div className="max-h-52 space-y-1 overflow-y-auto pr-1">{bodies.map((body) => <button key={body.id} type="button" className={cn("flex min-h-10 w-full items-center justify-between gap-2 rounded-sm px-2.5 text-left text-xs transition-colors", selectedBodyId === body.id ? "bg-accent text-accent-fg" : "bg-surface-2 text-fg hover:bg-border")} onClick={() => { setActiveTool("select"); setSelectedBodyId(body.id); setOpen(false); }}><span className="min-w-0 truncate font-semibold">{body.name}</span><span className="shrink-0 text-[10px] opacity-70">{body.groupId ? "Grouped" : body.kind}</span></button>)}</div>}
           </div>
 
           <div className="mt-3 grid grid-cols-1 gap-2 border-t border-border pt-3 sm:grid-cols-2 sm:gap-5"><Slider label="Gravity" value={gravity} min={0} max={20} step={0.1} display={gravity.toFixed(1)} onValueChange={setGravity} /><Slider label="Bounce" value={restitution} min={0} max={1} step={0.01} display={restitution.toFixed(2)} onValueChange={setRestitution} /></div>
